@@ -1,0 +1,87 @@
+{
+  "metadata": {
+    "timestamp": "2024-01-01T12:00:00",
+    "task": "factual_accuracy",
+    "criteria": [
+      "correctness"
+    ],
+    "retrieval_enabled": true,
+    "verifier_model": "minicheck-flan-t5-large",
+    "judge_models": [
+      "llama-3-8b",
+      "mistral-7b"
+    ],
+    "aggregation_strategy": "mean",
+    "num_retrieved_passages": 2,
+    "num_verifier_verdicts": 2,
+    "num_judge_results": 2
+  },
+  "consensus_score": 77.5,
+  "individual_scores": {
+    "llama-3-8b": 75.0,
+    "mistral-7b": 80.0
+  },
+  "verifier_verdicts": [
+    {
+      "label": "SUPPORTED",
+      "confidence": 0.9,
+      "evidence": [
+        "The source text confirms this claim."
+      ],
+      "reasoning": "The claim is directly supported by the source text."
+    },
+    {
+      "label": "REFUTED",
+      "confidence": 0.85,
+      "evidence": [
+        "The source text contradicts this claim."
+      ],
+      "reasoning": "The claim contradicts information in the source text."
+    }
+  ],
+  "retrieval_provenance": [
+    {
+      "text": "Paris is the capital and most populous city of France.",
+      "source": "Wikipedia:Paris",
+      "relevance_score": 0.95
+    },
+    {
+      "text": "France is a country primarily located in Western Europe.",
+      "source": "Wikipedia:France",
+      "relevance_score": 0.88
+    }
+  ],
+  "reasoning": {
+    "llama-3-8b": "The candidate output contains mostly accurate information about Paris and France. However, there is one factual error regarding the population figure.",
+    "mistral-7b": "The output is generally accurate and well-structured. Minor issues with specificity in some claims, but overall factually sound."
+  },
+  "confidence": 0.85,
+  "disagreement_level": 2.5,
+  "flagged_issues": [
+    {
+      "type": "hallucination",
+      "severity": "high",
+      "description": "Refuted claim: The claim contradicts information in the source text.",
+      "evidence": [
+        "The source text contradicts this claim."
+      ]
+    },
+    {
+      "type": "numerical_error",
+      "severity": "medium",
+      "description": "Population figure is incorrect",
+      "evidence": [
+        "Source states 2.1 million, candidate states 3 million"
+      ]
+    }
+  ],
+  "hallucination_categories": {
+    "factual_error": 1,
+    "unsupported_claim": 0,
+    "temporal_inconsistency": 0,
+    "numerical_error": 1,
+    "bias": 0,
+    "inconsistency": 0,
+    "other": 0
+  }
+}

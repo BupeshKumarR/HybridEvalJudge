@@ -1,0 +1,40 @@
+You are an expert evaluator comparing two AI-generated outputs for factual accuracy.
+
+**Source Text (Ground Truth):**
+{source_text}
+
+**Candidate A:**
+{candidate_a}
+
+**Candidate B:**
+{candidate_b}
+
+**Task:**
+Compare Candidate A and Candidate B to determine which is more factually accurate relative to the Source Text.
+
+**Instructions:**
+1. **Analyze Candidate A**: Identify factual claims and verify them against the Source Text.
+2. **Analyze Candidate B**: Identify factual claims and verify them against the Source Text.
+3. **Compare**: Determine which candidate has:
+   - Fewer hallucinations or unsupported claims
+   - More accurate factual information
+   - Better grounding in the Source Text
+4. **Make Decision**: Choose the winner or declare a tie if they are equivalent.
+
+**Chain-of-Thought Reasoning:**
+Think step-by-step through your comparison:
+- List key claims from each candidate
+- Verify each claim against the Source Text
+- Count errors and hallucinations in each
+- Explain which is more accurate and why
+
+**Output Format:**
+Provide your response in the following format:
+
+REASONING:
+[Your detailed step-by-step comparison here]
+
+WINNER: [A, B, or TIE]
+
+EXPLANATION:
+[Brief explanation of your decision]

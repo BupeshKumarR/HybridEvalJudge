@@ -1,0 +1,32 @@
+# Default configuration for LLM Judge Auditor
+# This file can be customized and loaded via ToolkitConfig.from_yaml()
+
+# Model configuration
+verifier_model: "MiniCheck/flan-t5-large-finetuned"
+judge_models:
+  - "meta-llama/Llama-3-8B"
+  - "mistralai/Mistral-7B-v0.1"
+quantize: true
+device: "auto"  # Options: cpu, cuda, mps, auto
+
+# Retrieval configuration
+knowledge_base_path: null  # Set to path for retrieval-augmented verification
+retrieval_top_k: 3
+enable_retrieval: false
+
+# Aggregation configuration
+aggregation_strategy: "mean"  # Options: mean, median, weighted_average, majority_vote
+judge_weights: null  # Only used with weighted_average
+disagreement_threshold: 20.0
+
+# Prompt configuration
+prompt_template_path: null  # Set to path for custom prompts
+custom_criteria: null
+
+# Performance configuration
+batch_size: 1
+max_length: 512
+num_iterations: 100  # For property-based testing
+
+# Cache configuration
+cache_dir: "~/.cache/llm-judge-auditor"

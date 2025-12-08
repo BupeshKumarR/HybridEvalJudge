@@ -1,0 +1,13 @@
+# Fast preset: Minimal processing for quick evaluations
+
+verifier_model: "MiniCheck/flan-t5-base-finetuned"
+judge_models:
+  - "microsoft/Phi-3-mini-4k-instruct"
+quantize: true
+device: "auto"
+
+enable_retrieval: false
+aggregation_strategy: "mean"
+
+batch_size: 1
+max_length: 512

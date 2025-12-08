@@ -1,0 +1,15 @@
+# Balanced preset: Good accuracy with reasonable resource usage
+
+verifier_model: "MiniCheck/flan-t5-large-finetuned"
+judge_models:
+  - "meta-llama/Llama-3-8B"
+  - "mistralai/Mistral-7B-v0.1"
+quantize: true
+device: "auto"
+
+enable_retrieval: true
+retrieval_top_k: 3
+aggregation_strategy: "mean"
+
+batch_size: 1
+max_length: 512

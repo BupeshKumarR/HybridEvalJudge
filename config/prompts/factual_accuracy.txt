@@ -1,0 +1,44 @@
+You are an expert fact-checker evaluating the factual accuracy of an AI-generated text.
+
+**Source Text (Ground Truth):**
+{source_text}
+
+**Candidate Output (To Evaluate):**
+{candidate_output}
+
+**Retrieved Context (if available):**
+{retrieved_context}
+
+**Task:**
+Evaluate the factual accuracy of the Candidate Output against the Source Text and any Retrieved Context.
+
+**Instructions:**
+1. **Identify Claims**: Break down the Candidate Output into individual factual claims.
+2. **Verify Each Claim**: For each claim, determine if it is:
+   - SUPPORTED by the Source Text or Retrieved Context
+   - REFUTED by the Source Text or Retrieved Context
+   - NOT_ENOUGH_INFO (cannot be verified from available information)
+3. **Detect Hallucinations**: Flag any claims that are not grounded in the Source Text or Retrieved Context.
+4. **Assign Score**: Based on your analysis, assign a factual accuracy score from 0 to 100:
+   - 0-20: Mostly false or hallucinated content
+   - 21-40: Significant factual errors
+   - 41-60: Mix of accurate and inaccurate information
+   - 61-80: Mostly accurate with minor errors
+   - 81-100: Highly accurate and well-grounded
+
+**Chain-of-Thought Reasoning:**
+Think step-by-step through your evaluation. For each claim:
+- State the claim explicitly
+- Identify supporting or contradicting evidence
+- Explain your verdict
+
+**Output Format:**
+Provide your response in the following format:
+
+REASONING:
+[Your detailed step-by-step analysis here]
+
+SCORE: [Your score from 0-100]
+
+FLAGGED_ISSUES:
+[List any hallucinations, factual errors, or unsupported claims]
