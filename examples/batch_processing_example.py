@@ -6,8 +6,18 @@ This example shows how to:
 2. Process them in batch with error resilience
 3. Access batch statistics
 4. Save results to JSON
+
+NOTE: For best performance with batch processing, use API judges with parallel execution.
+Set environment variables:
+  export GROQ_API_KEY="your-groq-key"
+  export GEMINI_API_KEY="your-gemini-key"
+
+Get free keys at:
+  - Groq: https://console.groq.com/keys
+  - Gemini: https://aistudio.google.com/app/apikey
 """
 
+import os
 from llm_judge_auditor import EvaluationToolkit, EvaluationRequest
 
 
@@ -16,6 +26,16 @@ def main():
     print("=" * 80)
     print("Batch Processing Example")
     print("=" * 80)
+
+    # Check for API keys
+    has_api_keys = bool(os.getenv("GROQ_API_KEY")) or bool(os.getenv("GEMINI_API_KEY"))
+    if has_api_keys:
+        print("\n✓ Using API judges for fast batch processing")
+    else:
+        print("\n⚠ No API keys - using local models (slower)")
+        print("  Get free API keys for faster batch processing:")
+        print("  • Groq: https://console.groq.com/keys")
+        print("  • Gemini: https://aistudio.google.com/app/apikey")
 
     # Create toolkit with fast preset for quick demonstration
     print("\n1. Initializing toolkit with 'fast' preset...")

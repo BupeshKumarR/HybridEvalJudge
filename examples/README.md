@@ -13,10 +13,25 @@ Before running examples, ensure you have:
    .venv\Scripts\activate.bat  # Windows
    ```
 
-2. **Verified installation**:
+2. **Set up API keys (Recommended)**:
+   ```bash
+   # Get free API keys:
+   # - Groq: https://console.groq.com/keys
+   # - Gemini: https://aistudio.google.com/app/apikey
+   
+   export GROQ_API_KEY="your-groq-key"
+   export GEMINI_API_KEY="your-gemini-key"
+   
+   # Install API dependencies
+   pip install groq google-generativeai
+   ```
+
+3. **Verified installation**:
    ```bash
    pytest  # All tests should pass
    ```
+
+**Note**: Examples work best with API judges (no model downloads needed). See [demo/FREE_SETUP_GUIDE.md](../demo/FREE_SETUP_GUIDE.md) for detailed setup.
 
 ## Example Scripts
 
@@ -32,11 +47,69 @@ python examples/simple_evaluation.py
 
 **What it demonstrates**:
 - Initializing toolkit with a preset
+- Using API judges automatically (if keys are set)
 - Evaluating a candidate output
 - Viewing results and scores
 - Exporting results to JSON
 
 **Recommended for**: First-time users, quick testing
+
+---
+
+### API Judge Examples
+
+#### API Judge Ensemble (`api_judge_ensemble_example.py`)
+
+Using free API-based judges (Groq and Gemini) for evaluation.
+
+```bash
+python examples/api_judge_ensemble_example.py
+```
+
+**What it demonstrates**:
+- Setting up API judges with free keys
+- Parallel judge execution for speed
+- Handling partial failures gracefully
+- Aggregating results from multiple API judges
+- No model downloads needed
+
+**Recommended for**: Fast evaluation, no GPU required, production use
+
+---
+
+#### Groq Judge (`groq_judge_example.py`)
+
+Using Groq Llama 3.1 70B for evaluation.
+
+```bash
+python examples/groq_judge_example.py
+```
+
+**What it demonstrates**:
+- Groq API integration
+- Fast inference with Llama 3.1 70B
+- Error handling and retries
+- Response parsing
+
+**Recommended for**: High-quality evaluation, fast inference
+
+---
+
+#### Gemini Judge (`gemini_judge_example.py`)
+
+Using Google Gemini Flash for evaluation.
+
+```bash
+python examples/gemini_judge_example.py
+```
+
+**What it demonstrates**:
+- Gemini API integration
+- Google's fast, free-tier LLM
+- Error handling and retries
+- Response parsing
+
+**Recommended for**: Free evaluation, Google ecosystem integration
 
 ---
 
@@ -188,6 +261,120 @@ python examples/report_generator_example.py
 ```
 
 Generating comprehensive evaluation reports.
+
+---
+
+#### Streaming Evaluator (`streaming_evaluator_example.py`)
+
+```bash
+python examples/streaming_evaluator_example.py
+```
+
+Processing large documents incrementally with chunking support.
+
+**What it demonstrates**:
+- Streaming evaluation for large documents
+- Configurable chunk size and overlap
+- Memory-efficient processing
+- Aggregating results across chunks
+
+**Recommended for**: Processing very large documents, memory-constrained environments
+
+---
+
+#### Verifier Trainer (`verifier_trainer_example.py`)
+
+```bash
+python examples/verifier_trainer_example.py
+```
+
+Fine-tuning specialized verifier models for fact-checking.
+
+**What it demonstrates**:
+- Loading training data in FEVER format
+- Fine-tuning small models for fact verification
+- Evaluating trained models
+- Saving and loading trained verifiers
+- Creating custom training datasets
+
+**Recommended for**: Domain-specific fact-checking, improving verifier accuracy
+
+---
+
+#### Plugin System (`plugin_system_example.py`)
+
+```bash
+python examples/plugin_system_example.py
+```
+
+Extending the toolkit with custom components using the plugin system.
+
+**What it demonstrates**:
+- Registering custom verifiers, judges, and aggregators
+- Plugin discovery from a plugins directory
+- Using custom plugins in evaluations
+- Version compatibility checking
+- Plugin metadata management
+
+**Recommended for**: Advanced users, custom evaluation strategies, domain-specific extensions
+
+---
+
+#### Adversarial Testing (`adversarial_tester_example.py`)
+
+```bash
+python examples/adversarial_tester_example.py
+```
+
+Testing the robustness of the evaluation toolkit against adversarial perturbations.
+
+**What it demonstrates**:
+- Generating adversarial perturbations (date shifts, location swaps, number changes)
+- Testing robustness with detection rate metrics
+- Pairwise ranking symmetry testing
+- Detailed perturbation analysis
+- Detection rates by perturbation type
+
+**Recommended for**: Robustness testing, quality assurance, research validation
+
+---
+
+#### Reliability Validation (`reliability_validator_example.py`)
+
+```bash
+python examples/reliability_validator_example.py
+```
+
+Validating the reliability and consistency of the evaluation system.
+
+**What it demonstrates**:
+- Checking evaluation consistency across multiple runs (variance < 5 points)
+- Calculating inter-model agreement using Cohen's kappa
+- Validating pairwise rankings with Kendall's Tau and Spearman's rho
+- Comprehensive reliability assessment
+- Interpreting reliability metrics
+
+**Recommended for**: Quality assurance, system validation, research validation
+
+---
+
+#### Benchmark Validation (`benchmark_validation_example.py`)
+
+```bash
+python examples/benchmark_validation_example.py
+```
+
+Running benchmark validation on FEVER and TruthfulQA datasets.
+
+**What it demonstrates**:
+- Downloading benchmark datasets (FEVER, TruthfulQA)
+- Running benchmark evaluations
+- Comparing different presets on benchmarks
+- Saving and loading benchmark results
+- Comparing results to published baselines
+- Custom evaluation logic for benchmarks
+
+**Recommended for**: System validation, performance benchmarking, research validation
 
 ---
 

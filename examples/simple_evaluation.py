@@ -7,8 +7,18 @@ This example demonstrates the most basic usage:
 3. View the results
 
 This is the recommended starting point for new users.
+
+NOTE: For the easiest setup, use free API judges (Groq and Gemini).
+Set environment variables:
+  export GROQ_API_KEY="your-groq-key"
+  export GEMINI_API_KEY="your-gemini-key"
+
+Get free keys at:
+  - Groq: https://console.groq.com/keys
+  - Gemini: https://aistudio.google.com/app/apikey
 """
 
+import os
 from llm_judge_auditor import EvaluationToolkit
 
 
@@ -17,6 +27,22 @@ def main():
     print("=" * 80)
     print("Simple Evaluation Example")
     print("=" * 80)
+
+    # Check for API keys
+    has_groq = bool(os.getenv("GROQ_API_KEY"))
+    has_gemini = bool(os.getenv("GEMINI_API_KEY"))
+    
+    if has_groq or has_gemini:
+        print("\n✓ API keys detected - using free API judges")
+        if has_groq:
+            print("  • Groq Llama 3.1 70B")
+        if has_gemini:
+            print("  • Google Gemini Flash")
+    else:
+        print("\n⚠ No API keys found - will use local models")
+        print("  For faster setup, get free API keys:")
+        print("  • Groq: https://console.groq.com/keys")
+        print("  • Gemini: https://aistudio.google.com/app/apikey")
 
     # Step 1: Initialize toolkit with a preset
     print("\n1. Initializing toolkit with 'fast' preset...")

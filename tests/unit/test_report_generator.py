@@ -490,3 +490,221 @@ class TestReportGenerator:
             # Should indicate no issues
             assert "No issues flagged" in content
             assert "No hallucinations detected" in content
+
+    def test_export_csv(self, sample_report):
+        """Test CSV export functionality."""
+        generator = ReportGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "report.csv"
+            generator.export_csv(sample_report, str(output_path))
+
+            # Verify file was created
+            assert output_path.exists()
+
+            # Read and verify CSV content
+            with open(output_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check for main sections
+            assert "EVALUATION SUMMARY" in content
+            assert "INDIVIDUAL JUDGE SCORES" in content
+            assert "VERIFIER VERDICTS" in content
+            assert "RETRIEVAL PROVENANCE" in content
+            assert "FLAGGED ISSUES" in content
+            assert "HALLUCINATION CATEGORIES" in content
+            assert "CHAIN-OF-THOUGHT REASONING" in content
+
+            # Check for specific values
+            assert "77.5" in content  # consensus score
+            assert "0.85" in content  # confidence
+            assert "llama-3-8b" in content
+            assert "mistral-7b" in content
+            assert "Wikipedia:Paris" in content
+
+    def test_export_csv_with_nested_directories(self, sample_report):
+        """Test CSV export with nested directory creation."""
+        generator = ReportGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "nested" / "dir" / "report.csv"
+            generator.export_csv(sample_report, str(output_path))
+
+            # Verify file was created
+            assert output_path.exists()
+
+            # Verify content
+            with open(output_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            assert "EVALUATION SUMMARY" in content
+            assert "77.5" in content
+
+    def test_csv_includes_all_metadata(self, sample_report):
+        """Test that CSV export includes all metadata fields."""
+        generator = ReportGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "report.csv"
+            generator.export_csv(sample_report, str(output_path))
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check metadata fields
+            assert "2024-01-01T12:00:00" in content
+            assert "factual_accuracy" in content
+            assert "minicheck-flan-t5-large" in content
+            assert "mean" in content
+
+    def test_csv_includes_verifier_verdicts(self, sample_report):
+        """Test that CSV export includes verifier verdicts."""
+        generator = ReportGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "report.csv"
+            generator.export_csv(sample_report, str(output_path))
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check verdicts
+            assert "SUPPORTED" in content
+            assert "REFUTED" in content
+            assert "The claim is supported by the source." in content
+
+    def test_csv_includes_retrieval_provenance(self, sample_report):
+        """Test that CSV export includes retrieval provenance."""
+        generator = ReportGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "report.csv"
+            generator.export_csv(sample_report, str(output_path))
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check retrieval provenance
+            assert "Wikipedia:Paris" in content
+            assert "Wikipedia:France" in content
+            assert "0.95" in content  # relevance score
+
+    def test_csv_includes_flagged_issues(self, sample_report):
+        """Test that CSV export includes flagged issues."""
+        generator = ReportGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "report.csv"
+            generator.export_csv(sample_report, str(output_path))
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check flagged issues
+            assert "hallucination" in content
+            assert "high" in content
+
+    def test_csv_includes_hallucination_categories(self, sample_report):
+        """Test that CSV export includes hallucination categories."""
+        generator = ReportGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "report.csv"
+            generator.export_csv(sample_report, str(output_path))
+
+            with open(output_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check hallucination categories
+            assert "Factual Error" in content or "factual_error" in content
+
+    def test_get_retrieval_provenance_summary(self, sample_report):
+        """Test retrieval provenance summary generation."""
+        generator = ReportGenerator()
+        summary = generator.get_retrieval_provenance_summary(sample_report)
+
+        assert summary["total_passages"] == 2
+        assert len(summary["sources"]) == 2
+        assert "Wikipedia:Paris" in summary["sources"]
+        assert "Wikipedia:France" in summary["sources"]
+        assert summary["source_distribution"]["Wikipedia:Paris"] == 1
+        assert summary["source_distribution"]["Wikipedia:France"] == 1
+        assert 0.0 <= summary["avg_relevance_score"] <= 1.0
+        assert 0.0 <= summary["min_relevance_score"] <= 1.0
+        assert 0.0 <= summary["max_relevance_score"] <= 1.0
+        assert "Wikipedia:Paris" in summary["passages_by_source"]
+        assert "Wikipedia:France" in summary["passages_by_source"]
+
+    def test_get_retrieval_provenance_summary_empty(self):
+        """Test retrieval provenance summary with no passages."""
+        metadata = {
+            "timestamp": "2024-01-01T12:00:00",
+            "task": "factual_accuracy",
+            "criteria": ["correctness"],
+            "retrieval_enabled": False,
+        }
+
+        report = Report(
+            metadata=metadata,
+            consensus_score=80.0,
+            individual_scores={"llama-3-8b": 80.0},
+            verifier_verdicts=[],
+            retrieval_provenance=[],
+            reasoning={"llama-3-8b": "Good output."},
+            confidence=0.9,
+            disagreement_level=0.0,
+            flagged_issues=[],
+            hallucination_categories={},
+        )
+
+        generator = ReportGenerator()
+        summary = generator.get_retrieval_provenance_summary(report)
+
+        assert summary["total_passages"] == 0
+        assert len(summary["sources"]) == 0
+        assert summary["avg_relevance_score"] == 0.0
+
+    def test_get_hallucination_summary(self, sample_report):
+        """Test hallucination summary generation."""
+        generator = ReportGenerator()
+        summary = generator.get_hallucination_summary(sample_report)
+
+        assert summary["total_hallucinations"] == 1
+        assert "factual_error" in summary["categories"]
+        assert summary["categories"]["factual_error"] == 1
+        assert "high" in summary["severity_distribution"]
+        assert summary["severity_distribution"]["high"] == 1
+        assert "hallucination" in summary["issues_by_type"]
+        assert len(summary["issues_by_severity"]["high"]) == 1
+
+    def test_get_hallucination_summary_empty(self):
+        """Test hallucination summary with no issues."""
+        metadata = {
+            "timestamp": "2024-01-01T12:00:00",
+            "task": "factual_accuracy",
+            "criteria": ["correctness"],
+        }
+
+        report = Report(
+            metadata=metadata,
+            consensus_score=95.0,
+            individual_scores={"llama-3-8b": 95.0},
+            verifier_verdicts=[],
+            retrieval_provenance=[],
+            reasoning={"llama-3-8b": "Excellent output."},
+            confidence=0.95,
+            disagreement_level=0.0,
+            flagged_issues=[],
+            hallucination_categories={
+                "factual_error": 0,
+                "unsupported_claim": 0,
+            },
+        )
+
+        generator = ReportGenerator()
+        summary = generator.get_hallucination_summary(report)
+
+        assert summary["total_hallucinations"] == 0
+        assert summary["severity_distribution"]["low"] == 0
+        assert summary["severity_distribution"]["medium"] == 0
+        assert summary["severity_distribution"]["high"] == 0

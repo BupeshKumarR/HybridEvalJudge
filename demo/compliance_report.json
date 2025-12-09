@@ -1,0 +1,34 @@
+{
+  "report_id": "HEALTH-EVAL-2024-001",
+  "generated_at": "2025-12-08T11:10:42.106580",
+  "evaluation_period": "2024-12-01 to 2024-12-08",
+  "total_evaluations": 1247,
+  "summary": {
+    "pass_rate": "78.3%",
+    "critical_issues": 23,
+    "high_severity": 87,
+    "medium_severity": 156,
+    "low_severity": 234
+  },
+  "model_performance": {
+    "model_a": {
+      "score": 82.5,
+      "pass_rate": "85%"
+    },
+    "model_b": {
+      "score": 76.3,
+      "pass_rate": "72%"
+    },
+    "model_c": {
+      "score": 88.1,
+      "pass_rate": "91%"
+    }
+  },
+  "compliance_status": "CONDITIONAL APPROVAL",
+  "recommendations": [
+    "Deploy Model C for production use",
+    "Retrain Model B on medical accuracy",
+    "Implement additional safety checks for critical topics",
+    "Add human review for responses scoring below 70"
+  ]
+}

@@ -3,9 +3,19 @@ Example usage of the EvaluationToolkit orchestrator.
 
 This script demonstrates how to use the main EvaluationToolkit class
 to evaluate LLM outputs for factual accuracy and hallucinations.
+
+NOTE: This example works best with API judges (no model downloads needed).
+Set environment variables:
+  export GROQ_API_KEY="your-groq-key"
+  export GEMINI_API_KEY="your-gemini-key"
+
+Get free keys at:
+  - Groq: https://console.groq.com/keys
+  - Gemini: https://aistudio.google.com/app/apikey
 """
 
 import logging
+import os
 from pathlib import Path
 
 from llm_judge_auditor import EvaluationToolkit, ToolkitConfig
@@ -30,9 +40,17 @@ def example_basic_evaluation():
     print("Example 1: Basic Evaluation with Preset")
     print("=" * 80 + "\n")
     
+    # Check for API keys
+    has_api_keys = bool(os.getenv("GROQ_API_KEY")) or bool(os.getenv("GEMINI_API_KEY"))
+    if has_api_keys:
+        print("✓ Using API judges (fast, no downloads needed)")
+    else:
+        print("⚠ No API keys - will download models (slower first run)")
+        print("  Get free API keys: https://console.groq.com/keys")
+    
     # Create toolkit from preset
-    # Note: This will attempt to load real models, which may take time
-    # For testing purposes, you may want to use mock models
+    # With API keys: Uses free API judges (fast)
+    # Without API keys: Downloads models (slower first time)
     try:
         toolkit = EvaluationToolkit.from_preset("fast")
         

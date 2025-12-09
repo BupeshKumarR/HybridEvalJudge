@@ -11,6 +11,7 @@ from llm_judge_auditor.config import (
     AggregationStrategy,
     DeviceType,
     PresetConfig,
+    APIConfig,
 )
 
 
@@ -20,10 +21,15 @@ class TestToolkitConfig:
     def test_default_config_creation(self):
         """Test creating a config with default values."""
         config = ToolkitConfig()
-        assert config.verifier_model is not None
-        assert len(config.judge_models) > 0
+        # Verifier is now optional when using API judges
+        assert config.verifier_model is not None or config.api_config is not None
+        # Judge models can be empty if using API judges
+        assert config.judge_models is not None
         assert config.quantize is True
         assert config.device == DeviceType.AUTO
+        # API config should be present
+        assert config.api_config is not None
+        assert config.api_config.enable_api_judges is True
 
     def test_custom_config_creation(self):
         """Test creating a config with custom values."""
@@ -79,6 +85,67 @@ class TestToolkitConfig:
         config = ToolkitConfig()
         assert config.cache_dir.name == "llm-judge-auditor"
         assert ".cache" in str(config.cache_dir)
+    
+    def test_api_config_integration(self):
+        """Test that APIConfig is properly integrated into ToolkitConfig."""
+        api_config = APIConfig(
+            groq_api_key="test_groq_key",
+            gemini_api_key="test_gemini_key",
+            parallel_execution=False
+        )
+        config = ToolkitConfig(api_config=api_config)
+        assert config.api_config.groq_api_key == "test_groq_key"
+        assert config.api_config.gemini_api_key == "test_gemini_key"
+        assert config.api_config.parallel_execution is False
+
+
+class TestAPIConfig:
+    """Test suite for APIConfig."""
+    
+    def test_default_api_config(self):
+        """Test creating APIConfig with default values."""
+        config = APIConfig()
+        assert config.groq_api_key is None
+        assert config.gemini_api_key is None
+        assert config.groq_model == "llama-3.3-70b-versatile"
+        assert config.gemini_model == "gemini-2.0-flash-exp"
+        assert config.timeout == 30
+        assert config.max_retries == 2
+        assert config.parallel_execution is True
+        assert config.enable_api_judges is True
+    
+    def test_custom_api_config(self):
+        """Test creating APIConfig with custom values."""
+        config = APIConfig(
+            groq_api_key="test_key",
+            groq_model="custom-model",
+            timeout=60,
+            max_retries=5,
+            parallel_execution=False
+        )
+        assert config.groq_api_key == "test_key"
+        assert config.groq_model == "custom-model"
+        assert config.timeout == 60
+        assert config.max_retries == 5
+        assert config.parallel_execution is False
+    
+    def test_has_any_keys(self):
+        """Test has_any_keys method."""
+        # No keys
+        config = APIConfig()
+        assert config.has_any_keys() is False
+        
+        # Only Groq key
+        config = APIConfig(groq_api_key="test_key")
+        assert config.has_any_keys() is True
+        
+        # Only Gemini key
+        config = APIConfig(gemini_api_key="test_key")
+        assert config.has_any_keys() is True
+        
+        # Both keys
+        config = APIConfig(groq_api_key="key1", gemini_api_key="key2")
+        assert config.has_any_keys() is True
 
 
 class TestPresetConfig:
@@ -88,36 +155,46 @@ class TestPresetConfig:
         """Test fast preset configuration."""
         config = PresetConfig.fast()
         assert config.enable_retrieval is False
-        assert len(config.judge_models) == 1
+        # Fast preset now uses API judges by default
+        assert config.api_config is not None
+        assert config.api_config.enable_api_judges is True
         assert config.quantize is True
 
     def test_balanced_preset(self):
         """Test balanced preset configuration."""
         config = PresetConfig.balanced()
         assert config.enable_retrieval is True
-        assert len(config.judge_models) == 2
+        # Balanced preset now uses API judges by default
+        assert config.api_config is not None
+        assert config.api_config.enable_api_judges is True
         assert config.quantize is True
 
     def test_strict_preset(self):
         """Test strict preset configuration."""
         config = PresetConfig.strict()
         assert config.enable_retrieval is True
-        assert len(config.judge_models) == 3
-        assert config.aggregation_strategy == AggregationStrategy.WEIGHTED_AVERAGE
-        assert config.judge_weights is not None
+        # Strict preset now uses API judges by default
+        assert config.api_config is not None
+        assert config.api_config.enable_api_judges is True
+        assert config.aggregation_strategy == AggregationStrategy.MEAN
         assert config.disagreement_threshold == 15.0
 
     def test_research_preset(self):
         """Test research preset configuration."""
         config = PresetConfig.research()
         assert config.enable_retrieval is True
+        # Research preset now uses API judges by default
+        assert config.api_config is not None
+        assert config.api_config.enable_api_judges is True
         assert config.num_iterations == 200
 
     def test_from_preset_method(self):
         """Test loading preset via from_preset method."""
         config = ToolkitConfig.from_preset("balanced")
         assert config.enable_retrieval is True
-        assert len(config.judge_models) == 2
+        # Balanced preset now uses API judges by default
+        assert config.api_config is not None
+        assert config.api_config.enable_api_judges is True
 
     def test_from_preset_invalid_name(self):
         """Test that invalid preset name raises error."""

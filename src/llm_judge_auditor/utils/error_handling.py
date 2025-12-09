@@ -16,7 +16,7 @@ import signal
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 logger = logging.getLogger(__name__)
 
@@ -530,3 +530,437 @@ def handle_inference_error(
         "action": action,
         "timestamp": time.time(),
     }
+
+
+# API-specific error handling utilities
+
+class APIErrorHandler:
+    """
+    Centralized error handler for API judge operations.
+    
+    This class provides comprehensive error handling for API-based judges,
+    including missing keys, network errors, rate limits, and malformed responses.
+    
+    Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
+    """
+    
+    @staticmethod
+    def handle_missing_keys(available_keys: Dict[str, bool]) -> Dict[str, Any]:
+        """
+        Handle missing API keys scenario.
+        
+        Args:
+            available_keys: Dict mapping service name to availability
+        
+        Returns:
+            Error information with setup instructions
+        
+        Requirements: 6.1
+        """
+        missing_services = [
+            service for service, available in available_keys.items()
+            if not available
+        ]
+        
+        if not missing_services:
+            return {
+                "error": False,
+                "message": "All API keys are available"
+            }
+        
+        error_info = {
+            "error": True,
+            "error_type": "MissingAPIKeys",
+            "missing_services": missing_services,
+            "message": f"Missing API keys for: {', '.join(missing_services)}",
+            "action": "configure_api_keys",
+            "help": (
+                "To obtain free API keys:\n"
+                "  - Groq: https://console.groq.com/keys\n"
+                "  - Gemini: https://aistudio.google.com/app/apikey\n"
+                "\n"
+                "Set environment variables:\n"
+                "  export GROQ_API_KEY='your-key'\n"
+                "  export GEMINI_API_KEY='your-key'"
+            )
+        }
+        
+        logger.error(f"Missing API keys: {missing_services}")
+        return error_info
+    
+    @staticmethod
+    def handle_authentication_error(
+        service: str,
+        error: Exception
+    ) -> Dict[str, Any]:
+        """
+        Handle API authentication errors.
+        
+        Args:
+            service: Service name (groq, gemini)
+            error: The authentication exception
+        
+        Returns:
+            Error information with troubleshooting steps
+        
+        Requirements: 6.2
+        """
+        error_info = {
+            "error": True,
+            "error_type": "AuthenticationError",
+            "service": service,
+            "message": f"{service.title()} API authentication failed",
+            "original_error": str(error),
+            "action": "check_api_key",
+            "help": (
+                f"Your {service.title()} API key appears to be invalid.\n"
+                "\n"
+                "Troubleshooting steps:\n"
+                "  1. Verify your API key is correct (no extra spaces/quotes)\n"
+                "  2. Check that the key is active in your account\n"
+                "  3. Ensure you're using the correct environment variable:\n"
+                f"     export {service.upper()}_API_KEY='your-key'\n"
+                "  4. Try generating a new API key if the issue persists"
+            )
+        }
+        
+        logger.error(
+            f"Authentication failed for {service}: {error}",
+            exc_info=True
+        )
+        return error_info
+    
+    @staticmethod
+    def handle_network_error(
+        service: str,
+        error: Exception,
+        retry_count: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Handle network-related errors.
+        
+        Args:
+            service: Service name (groq, gemini)
+            error: The network exception
+            retry_count: Number of retries attempted
+        
+        Returns:
+            Error information with troubleshooting steps
+        
+        Requirements: 6.3
+        """
+        error_info = {
+            "error": True,
+            "error_type": "NetworkError",
+            "service": service,
+            "message": f"Network error when calling {service.title()} API",
+            "original_error": str(error),
+            "retry_count": retry_count,
+            "action": "check_connectivity",
+            "help": (
+                "Network connection issue detected.\n"
+                "\n"
+                "Troubleshooting steps:\n"
+                "  1. Check your internet connection\n"
+                "  2. Verify you can access the API endpoint:\n"
+                f"     - Groq: https://api.groq.com\n"
+                f"     - Gemini: https://generativelanguage.googleapis.com\n"
+                "  3. Check if your firewall is blocking the connection\n"
+                "  4. Try again in a few moments\n"
+                "  5. Check API service status pages for outages"
+            )
+        }
+        
+        logger.error(
+            f"Network error for {service} (retry {retry_count}): {error}",
+            exc_info=True
+        )
+        return error_info
+    
+    @staticmethod
+    def handle_rate_limit_error(
+        service: str,
+        error: Exception,
+        retry_after: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Handle rate limit errors.
+        
+        Args:
+            service: Service name (groq, gemini)
+            error: The rate limit exception
+            retry_after: Suggested retry delay in seconds
+        
+        Returns:
+            Error information with rate limit details
+        
+        Requirements: 6.3
+        """
+        # Default rate limits for free tiers
+        rate_limits = {
+            "groq": "30 requests per minute",
+            "gemini": "15 requests per minute"
+        }
+        
+        error_info = {
+            "error": True,
+            "error_type": "RateLimitError",
+            "service": service,
+            "message": f"{service.title()} API rate limit exceeded",
+            "original_error": str(error),
+            "retry_after": retry_after,
+            "rate_limit": rate_limits.get(service, "Unknown"),
+            "action": "wait_and_retry",
+            "help": (
+                f"You've hit the {service.title()} API rate limit.\n"
+                "\n"
+                f"Free tier limit: {rate_limits.get(service, 'Unknown')}\n"
+                "\n"
+                "What to do:\n"
+                f"  1. Wait {retry_after or 60} seconds before retrying\n"
+                "  2. Reduce the frequency of API calls\n"
+                "  3. Consider upgrading to a paid tier for higher limits\n"
+                "  4. Use batch processing to optimize API usage"
+            )
+        }
+        
+        logger.warning(
+            f"Rate limit hit for {service}. Retry after: {retry_after}s"
+        )
+        return error_info
+    
+    @staticmethod
+    def handle_malformed_response(
+        service: str,
+        response_text: str,
+        parse_error: Exception
+    ) -> Dict[str, Any]:
+        """
+        Handle malformed API responses.
+        
+        Args:
+            service: Service name (groq, gemini)
+            response_text: The malformed response text
+            parse_error: The parsing exception
+        
+        Returns:
+            Error information with partial results if available
+        
+        Requirements: 6.4
+        """
+        # Try to extract any useful information from the response
+        partial_data = None
+        try:
+            # Attempt to extract a score using fallback parsing
+            score_result = parse_score_with_fallback(response_text)
+            if score_result.success or score_result.data != 50.0:
+                partial_data = {"score": score_result.data}
+        except:
+            pass
+        
+        error_info = {
+            "error": True,
+            "error_type": "MalformedResponse",
+            "service": service,
+            "message": f"Could not parse {service.title()} API response",
+            "original_error": str(parse_error),
+            "response_preview": response_text[:200] if response_text else None,
+            "partial_data": partial_data,
+            "action": "use_fallback_parsing",
+            "help": (
+                "The API returned a response that couldn't be parsed.\n"
+                "\n"
+                "This may indicate:\n"
+                "  1. The API response format has changed\n"
+                "  2. The model didn't follow the expected output format\n"
+                "  3. The response was truncated or corrupted\n"
+                "\n"
+                "The system will use fallback parsing to extract partial results."
+            )
+        }
+        
+        logger.warning(
+            f"Malformed response from {service}: {parse_error}. "
+            f"Response preview: {response_text[:100] if response_text else 'None'}"
+        )
+        return error_info
+    
+    @staticmethod
+    def handle_partial_failure(
+        total_judges: int,
+        successful_judges: int,
+        failed_judges: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Handle scenarios where some judges succeed and others fail.
+        
+        Args:
+            total_judges: Total number of judges
+            successful_judges: Number of successful judges
+            failed_judges: List of failed judge names
+        
+        Returns:
+            Status information about partial failure
+        
+        Requirements: 6.4
+        """
+        if successful_judges == 0:
+            # Complete failure
+            error_info = {
+                "error": True,
+                "error_type": "CompleteFailure",
+                "message": "All judges failed during evaluation",
+                "total_judges": total_judges,
+                "successful_judges": 0,
+                "failed_judges": failed_judges,
+                "action": "check_all_configurations",
+                "help": (
+                    "All API judges failed to complete evaluation.\n"
+                    "\n"
+                    "Troubleshooting steps:\n"
+                    "  1. Verify all API keys are valid\n"
+                    "  2. Check your internet connection\n"
+                    "  3. Ensure required packages are installed:\n"
+                    "     pip install groq google-generativeai\n"
+                    "  4. Check API service status pages\n"
+                    "  5. Review logs for specific error messages"
+                )
+            }
+            logger.error(f"All {total_judges} judges failed: {failed_judges}")
+        else:
+            # Partial failure
+            error_info = {
+                "error": False,
+                "warning": True,
+                "error_type": "PartialFailure",
+                "message": f"{successful_judges}/{total_judges} judges succeeded",
+                "total_judges": total_judges,
+                "successful_judges": successful_judges,
+                "failed_judges": failed_judges,
+                "action": "continue_with_available",
+                "help": (
+                    f"Some judges failed, but {successful_judges} succeeded.\n"
+                    "\n"
+                    "The evaluation will continue with available judges.\n"
+                    "Check logs for details about failed judges."
+                )
+            }
+            logger.warning(
+                f"Partial failure: {successful_judges}/{total_judges} judges succeeded. "
+                f"Failed: {failed_judges}"
+            )
+        
+        return error_info
+    
+    @staticmethod
+    def get_comprehensive_troubleshooting_guide() -> str:
+        """
+        Get a comprehensive troubleshooting guide for all error types.
+        
+        Returns:
+            Formatted troubleshooting guide
+        
+        Requirements: 6.5, 6.6
+        """
+        guide = "\n"
+        guide += "╔══════════════════════════════════════════════════════════════╗\n"
+        guide += "║  🔧 Comprehensive Troubleshooting Guide                      ║\n"
+        guide += "╠══════════════════════════════════════════════════════════════╣\n"
+        guide += "║                                                              ║\n"
+        guide += "║  ERROR TYPE: Missing API Keys                               ║\n"
+        guide += "║  ────────────────────────────────────────────────────────   ║\n"
+        guide += "║  Symptoms: \"No API keys configured\" error                   ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Solutions:                                                 ║\n"
+        guide += "║  1. Get free API keys:                                      ║\n"
+        guide += "║     • Groq: https://console.groq.com/keys                   ║\n"
+        guide += "║     • Gemini: https://aistudio.google.com/app/apikey        ║\n"
+        guide += "║  2. Set environment variables:                              ║\n"
+        guide += "║     export GROQ_API_KEY='your-key'                          ║\n"
+        guide += "║     export GEMINI_API_KEY='your-key'                        ║\n"
+        guide += "║  3. Restart your terminal/application                       ║\n"
+        guide += "║                                                              ║\n"
+        guide += "╠══════════════════════════════════════════════════════════════╣\n"
+        guide += "║                                                              ║\n"
+        guide += "║  ERROR TYPE: Authentication Failed                          ║\n"
+        guide += "║  ────────────────────────────────────────────────────────   ║\n"
+        guide += "║  Symptoms: \"Invalid API key\" or \"401/403\" errors            ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Solutions:                                                 ║\n"
+        guide += "║  1. Verify API key is copied correctly (no spaces/quotes)   ║\n"
+        guide += "║  2. Check key is active in your account dashboard           ║\n"
+        guide += "║  3. Ensure correct environment variable name                ║\n"
+        guide += "║  4. Try generating a new API key                            ║\n"
+        guide += "║  5. Verify you're using the right API service               ║\n"
+        guide += "║                                                              ║\n"
+        guide += "╠══════════════════════════════════════════════════════════════╣\n"
+        guide += "║                                                              ║\n"
+        guide += "║  ERROR TYPE: Network Error                                  ║\n"
+        guide += "║  ────────────────────────────────────────────────────────   ║\n"
+        guide += "║  Symptoms: Connection timeout, DNS errors                   ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Solutions:                                                 ║\n"
+        guide += "║  1. Check internet connection                               ║\n"
+        guide += "║  2. Verify firewall isn't blocking API requests             ║\n"
+        guide += "║  3. Try accessing API endpoints in browser:                 ║\n"
+        guide += "║     • https://api.groq.com                                  ║\n"
+        guide += "║     • https://generativelanguage.googleapis.com             ║\n"
+        guide += "║  4. Check API service status pages                          ║\n"
+        guide += "║  5. Wait a few minutes and retry                            ║\n"
+        guide += "║                                                              ║\n"
+        guide += "╠══════════════════════════════════════════════════════════════╣\n"
+        guide += "║                                                              ║\n"
+        guide += "║  ERROR TYPE: Rate Limit Exceeded                            ║\n"
+        guide += "║  ────────────────────────────────────────────────────────   ║\n"
+        guide += "║  Symptoms: \"429\" errors, \"quota exceeded\"                   ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Free Tier Limits:                                          ║\n"
+        guide += "║  • Groq: 30 requests per minute                             ║\n"
+        guide += "║  • Gemini: 15 requests per minute                           ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Solutions:                                                 ║\n"
+        guide += "║  1. Wait 60 seconds before retrying                         ║\n"
+        guide += "║  2. Reduce frequency of API calls                           ║\n"
+        guide += "║  3. Use batch processing for multiple evaluations           ║\n"
+        guide += "║  4. Consider upgrading to paid tier                         ║\n"
+        guide += "║                                                              ║\n"
+        guide += "╠══════════════════════════════════════════════════════════════╣\n"
+        guide += "║                                                              ║\n"
+        guide += "║  ERROR TYPE: Malformed Response                             ║\n"
+        guide += "║  ────────────────────────────────────────────────────────   ║\n"
+        guide += "║  Symptoms: JSON parse errors, unexpected format             ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Solutions:                                                 ║\n"
+        guide += "║  1. System will use fallback parsing automatically          ║\n"
+        guide += "║  2. Check if API response format has changed                ║\n"
+        guide += "║  3. Verify model is following expected output format        ║\n"
+        guide += "║  4. Review logs for response preview                        ║\n"
+        guide += "║  5. Report issue if it persists                             ║\n"
+        guide += "║                                                              ║\n"
+        guide += "╠══════════════════════════════════════════════════════════════╣\n"
+        guide += "║                                                              ║\n"
+        guide += "║  ERROR TYPE: All Judges Failed                              ║\n"
+        guide += "║  ────────────────────────────────────────────────────────   ║\n"
+        guide += "║  Symptoms: Complete evaluation failure                      ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Solutions:                                                 ║\n"
+        guide += "║  1. Check all API keys are valid                            ║\n"
+        guide += "║  2. Verify internet connectivity                            ║\n"
+        guide += "║  3. Ensure packages installed:                              ║\n"
+        guide += "║     pip install groq google-generativeai                    ║\n"
+        guide += "║  4. Review detailed error logs                              ║\n"
+        guide += "║  5. Try each API service individually                       ║\n"
+        guide += "║                                                              ║\n"
+        guide += "╠══════════════════════════════════════════════════════════════╣\n"
+        guide += "║                                                              ║\n"
+        guide += "║  Need More Help?                                            ║\n"
+        guide += "║                                                              ║\n"
+        guide += "║  • Check logs for detailed error messages                   ║\n"
+        guide += "║  • Review API documentation:                                ║\n"
+        guide += "║    - Groq: https://console.groq.com/docs                    ║\n"
+        guide += "║    - Gemini: https://ai.google.dev/docs                     ║\n"
+        guide += "║  • Report issues on GitHub                                  ║\n"
+        guide += "║                                                              ║\n"
+        guide += "╚══════════════════════════════════════════════════════════════╝\n"
+        
+        return guide

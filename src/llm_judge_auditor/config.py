@@ -5,6 +5,7 @@ This module defines the configuration structure using Pydantic for validation
 and type safety. It includes the main ToolkitConfig class and related enums.
 """
 
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -30,6 +31,90 @@ class DeviceType(str, Enum):
     AUTO = "auto"  # Auto-detect best available
 
 
+class APIConfig(BaseModel):
+    """
+    Configuration for API-based judge services.
+    
+    This configuration controls API judge settings including API keys,
+    model selection, retry behavior, and parallel execution.
+    """
+    
+    # API Keys (loaded from environment by default)
+    groq_api_key: Optional[str] = Field(
+        default=None,
+        description="Groq API key (defaults to GROQ_API_KEY environment variable)"
+    )
+    gemini_api_key: Optional[str] = Field(
+        default=None,
+        description="Gemini API key (defaults to GEMINI_API_KEY environment variable)"
+    )
+    
+    # Model selection
+    groq_model: str = Field(
+        default="llama-3.3-70b-versatile",
+        description="Groq model to use for evaluation"
+    )
+    gemini_model: str = Field(
+        default="gemini-2.0-flash-exp",
+        description="Gemini model to use for evaluation"
+    )
+    
+    # API behavior
+    timeout: int = Field(
+        default=30,
+        ge=5,
+        le=120,
+        description="Timeout for API calls in seconds"
+    )
+    max_retries: int = Field(
+        default=2,
+        ge=0,
+        le=5,
+        description="Maximum number of retries for failed API calls"
+    )
+    base_delay: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Base delay for exponential backoff in seconds"
+    )
+    
+    # Execution settings
+    parallel_execution: bool = Field(
+        default=True,
+        description="Execute API judges in parallel for faster evaluation"
+    )
+    
+    # Feature flags
+    enable_api_judges: bool = Field(
+        default=True,
+        description="Enable API-based judges (Groq, Gemini)"
+    )
+    
+    def load_keys_from_env(self) -> None:
+        """
+        Load API keys from environment variables if not already set.
+        
+        Checks for:
+        - GROQ_API_KEY
+        - GEMINI_API_KEY
+        """
+        if self.groq_api_key is None:
+            self.groq_api_key = os.environ.get("GROQ_API_KEY")
+        
+        if self.gemini_api_key is None:
+            self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    
+    def has_any_keys(self) -> bool:
+        """
+        Check if any API keys are configured.
+        
+        Returns:
+            True if at least one API key is available
+        """
+        return bool(self.groq_api_key or self.gemini_api_key)
+
+
 class ToolkitConfig(BaseModel):
     """
     Main configuration for the Evaluation Toolkit.
@@ -39,19 +124,25 @@ class ToolkitConfig(BaseModel):
     """
 
     # Model configuration
-    verifier_model: str = Field(
+    verifier_model: Optional[str] = Field(
         default="MiniCheck/flan-t5-large-finetuned",
-        description="HuggingFace model identifier for the specialized verifier",
+        description="HuggingFace model identifier for the specialized verifier (optional if using API judges)",
     )
     judge_models: List[str] = Field(
-        default=["meta-llama/Llama-3-8B", "mistralai/Mistral-7B-v0.1"],
-        description="List of HuggingFace model identifiers for judge ensemble",
+        default=[],
+        description="List of HuggingFace model identifiers for judge ensemble (optional if using API judges)",
     )
     quantize: bool = Field(
         default=True, description="Enable 8-bit quantization to reduce memory usage"
     )
     device: DeviceType = Field(
         default=DeviceType.AUTO, description="Device to run models on (cpu, cuda, mps, auto)"
+    )
+    
+    # API configuration
+    api_config: APIConfig = Field(
+        default_factory=APIConfig,
+        description="Configuration for API-based judge services"
     )
 
     # Retrieval configuration
@@ -174,18 +265,22 @@ class PresetConfig:
         Fast preset: Minimal processing for quick evaluations.
 
         - No retrieval
-        - Single lightweight judge (Phi-3-mini)
-        - Quantization enabled
+        - API judges preferred (faster than local models)
+        - Quantization enabled for local models
         - Small batch size
         """
+        api_config = APIConfig()
+        api_config.load_keys_from_env()
+        
         return ToolkitConfig(
-            verifier_model="MiniCheck/flan-t5-base-finetuned",
-            judge_models=["microsoft/Phi-3-mini-4k-instruct"],
+            verifier_model=None,  # Optional when using API judges
+            judge_models=[],  # Use API judges if available
             quantize=True,
             enable_retrieval=False,
             aggregation_strategy=AggregationStrategy.MEAN,
             batch_size=1,
             max_length=512,
+            api_config=api_config,
         )
 
     @staticmethod
@@ -194,18 +289,22 @@ class PresetConfig:
         Balanced preset: Good accuracy with reasonable resource usage.
 
         - Retrieval enabled
-        - 1 verifier + 2 judges
-        - Quantization enabled
+        - API judges preferred (no model downloads required)
+        - Verifier optional
         - Standard settings
         """
+        api_config = APIConfig()
+        api_config.load_keys_from_env()
+        
         return ToolkitConfig(
-            verifier_model="MiniCheck/flan-t5-large-finetuned",
-            judge_models=["meta-llama/Llama-3-8B", "mistralai/Mistral-7B-v0.1"],
+            verifier_model=None,  # Optional when using API judges
+            judge_models=[],  # Use API judges if available
             quantize=True,
             enable_retrieval=True,
             aggregation_strategy=AggregationStrategy.MEAN,
             batch_size=1,
             max_length=512,
+            api_config=api_config,
         )
 
     @staticmethod
@@ -214,28 +313,23 @@ class PresetConfig:
         Strict preset: Maximum accuracy with full pipeline.
 
         - Retrieval enabled
-        - 3 judges for ensemble
-        - Weighted average aggregation
+        - API judges for ensemble
+        - Mean aggregation
         - Lower disagreement threshold
         """
+        api_config = APIConfig()
+        api_config.load_keys_from_env()
+        
         return ToolkitConfig(
-            verifier_model="MiniCheck/flan-t5-large-finetuned",
-            judge_models=[
-                "meta-llama/Llama-3-8B",
-                "mistralai/Mistral-7B-v0.1",
-                "microsoft/Phi-3-mini-4k-instruct",
-            ],
+            verifier_model=None,  # Optional when using API judges
+            judge_models=[],  # Use API judges if available
             quantize=True,
             enable_retrieval=True,
-            aggregation_strategy=AggregationStrategy.WEIGHTED_AVERAGE,
-            judge_weights={
-                "meta-llama/Llama-3-8B": 0.4,
-                "mistralai/Mistral-7B-v0.1": 0.4,
-                "microsoft/Phi-3-mini-4k-instruct": 0.2,
-            },
+            aggregation_strategy=AggregationStrategy.MEAN,
             disagreement_threshold=15.0,
             batch_size=1,
             max_length=1024,
+            api_config=api_config,
         )
 
     @staticmethod
@@ -244,17 +338,21 @@ class PresetConfig:
         Research preset: Maximum transparency and metrics.
 
         - All features enabled
-        - Multiple judges
+        - API judges for evaluation
         - High iteration count for property testing
         - Detailed reporting
         """
+        api_config = APIConfig()
+        api_config.load_keys_from_env()
+        
         return ToolkitConfig(
-            verifier_model="MiniCheck/flan-t5-large-finetuned",
-            judge_models=["meta-llama/Llama-3-8B", "mistralai/Mistral-7B-v0.1"],
+            verifier_model=None,  # Optional when using API judges
+            judge_models=[],  # Use API judges if available
             quantize=True,
             enable_retrieval=True,
             aggregation_strategy=AggregationStrategy.MEAN,
             batch_size=1,
             max_length=1024,
             num_iterations=200,  # More iterations for thorough testing
+            api_config=api_config,
         )

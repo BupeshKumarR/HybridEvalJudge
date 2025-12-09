@@ -1,0 +1,67 @@
+{
+  "timestamp": "2025-12-08T18:41:33.648556",
+  "question": "What are the early warning signs of Type 2 diabetes? List the main symptoms.",
+  "reference": "Type 2 diabetes symptoms often develop slowly. Common symptoms include:\n- Increased thirst and frequent urination\n- Increased hunger\n- Unintended weight loss\n- Fatigue and weakness\n- Blurred vision\n- Slow-healing sores or frequent infections\n- Numbness or tingling in hands or feet\n- Darkened skin areas, usually in armpits and neck",
+  "response": "Type 2 diabetes has several early warning signs:\n1. Increased thirst and frequent urination - Your body tries to flush out excess sugar\n2. Increased hunger - Cells aren't getting enough glucose for energy\n3. Fatigue - Without proper glucose metabolism, you feel tired\n4. Blurred vision - High blood sugar affects the lens of your eye\n5. Slow healing - High blood sugar impairs circulation and immune function\n6. Tingling in extremities - Nerve damage from prolonged high blood sugar\n\nThese symptoms develop gradually and may be mild at first.",
+  "judges_used": [
+    "groq-llama-3.3-70b-versatile",
+    "gemini-gemini-2.0-flash-exp"
+  ],
+  "individual_scores": {
+    "groq-llama-3.3-70b-versatile": 80.0,
+    "gemini-gemini-2.0-flash-exp": 90.0
+  },
+  "consensus_score": 85.0,
+  "disagreement_level": 25.0,
+  "verdict": "APPROVED",
+  "verdicts": [
+    {
+      "judge_name": "groq-llama-3.3-70b-versatile",
+      "score": 80.0,
+      "confidence": 0.9,
+      "reasoning": "The Candidate Output accurately describes several key symptoms of Type 2 diabetes, including increased thirst and urination, increased hunger, fatigue, blurred vision, slow healing, and tingling in extremities. These symptoms are correctly identified in the Source Text. However, the Candidate Output omits some symptoms mentioned in the Source Text, such as unintended weight loss, numbness or tingling in hands or feet (beyond just 'tingling in extremities'), and darkened skin areas. Additionally, while the Candidate Output provides explanations for the symptoms, these are not directly compared against the Source Text for accuracy.",
+      "issues": [
+        {
+          "type": "IssueType.FACTUAL_ERROR",
+          "severity": "IssueSeverity.MEDIUM",
+          "description": "Omission of symptoms like unintended weight loss, numbness or tingling in hands or feet, and darkened skin areas",
+          "evidence": [
+            "Entire response"
+          ]
+        },
+        {
+          "type": "IssueType.INCONSISTENCY",
+          "severity": "IssueSeverity.LOW",
+          "description": "The Candidate Output mentions 'tingling in extremities' which might not fully capture the specificity of 'numbness or tingling in hands or feet' from the Source Text",
+          "evidence": [
+            "Point 6 of the Candidate Output"
+          ]
+        }
+      ]
+    },
+    {
+      "judge_name": "gemini-gemini-2.0-flash-exp",
+      "score": 90.0,
+      "confidence": 0.95,
+      "reasoning": "The candidate output accurately reflects the symptoms of type 2 diabetes as described in the source text. It correctly lists increased thirst and frequent urination, increased hunger, fatigue, blurred vision, slow healing, and tingling in extremities as early warning signs. The explanations provided for each symptom are generally accurate and consistent with the underlying mechanisms of diabetes. The candidate output omits 'Unintended weight loss', 'Darkened skin areas, usually in armpits and neck' and 'Numbness or tingling in hands or feet' which are listed in the source text. The inclusion of 'tingling in extremities' is similar to 'Numbness or tingling in hands or feet' but not exactly the same.",
+      "issues": [
+        {
+          "type": "IssueType.UNSUPPORTED_CLAIM",
+          "severity": "IssueSeverity.MEDIUM",
+          "description": "The candidate output omits 'Unintended weight loss' which is listed in the source text.",
+          "evidence": [
+            "Missing from list of symptoms"
+          ]
+        },
+        {
+          "type": "IssueType.UNSUPPORTED_CLAIM",
+          "severity": "IssueSeverity.MEDIUM",
+          "description": "The candidate output omits 'Darkened skin areas, usually in armpits and neck' which is listed in the source text.",
+          "evidence": [
+            "Missing from list of symptoms"
+          ]
+        }
+      ]
+    }
+  ]
+}

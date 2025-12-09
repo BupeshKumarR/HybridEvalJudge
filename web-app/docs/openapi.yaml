@@ -1,0 +1,780 @@
+openapi: 3.0.3
+info:
+  title: LLM Judge Auditor API
+  description: |
+    RESTful API for the LLM Judge Auditor Web Application.
+    
+    This API provides endpoints for:
+    - User authentication and management
+    - Creating and managing evaluation sessions
+    - Retrieving evaluation results and history
+    - Exporting evaluation data
+    - Managing user preferences
+    
+    Real-time evaluation updates are delivered via WebSocket (see WebSocket documentation).
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@llm-judge-auditor.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+  - url: https://api.llm-judge-auditor.com/api/v1
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and registration
+  - name: Evaluations
+    description: Evaluation session management
+  - name: Preferences
+    description: User preferences and settings
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new user account with username, email, and password
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+            example:
+              username: johndoe
+              email: john@example.com
+              password: SecurePass123!
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user
+      description: Login with username and password to receive JWT token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+            example:
+              username: johndoe
+              password: SecurePass123!
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Retrieve information about the authenticated user
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User information retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /evaluations:
+    post:
+      tags:
+        - Evaluations
+      summary: Create evaluation
+      description: Create a new evaluation session
+      operationId: createEvaluation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationCreate'
+            example:
+              source_text: "The capital of France is Paris."
+              candidate_output: "Paris is the capital and largest city of France."
+              config:
+                judge_models: ["gpt-4"]
+                enable_retrieval: true
+                aggregation_strategy: "mean"
+      responses:
+        '201':
+          description: Evaluation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      tags:
+        - Evaluations
+      summary: List evaluations
+      description: Get paginated list of user's evaluation sessions
+      operationId: listEvaluations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: sort_by
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [created_at, consensus_score]
+            default: created_at
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: min_score
+          in: query
+          description: Minimum consensus score filter
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 100
+        - name: max_score
+          in: query
+          description: Maximum consensus score filter
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 100
+        - name: search
+          in: query
+          description: Search in source text or candidate output
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evaluation list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /evaluations/{session_id}:
+    get:
+      tags:
+        - Evaluations
+      summary: Get evaluation
+      description: Retrieve detailed results for a specific evaluation session
+      operationId: getEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          description: Evaluation session ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Evaluation retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Evaluations
+      summary: Delete evaluation
+      description: Delete an evaluation session
+      operationId: deleteEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          description: Evaluation session ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Evaluation deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /evaluations/{session_id}/export:
+    get:
+      tags:
+        - Evaluations
+      summary: Export evaluation
+      description: Export evaluation results in various formats
+      operationId: exportEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          description: Evaluation session ID
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          required: true
+          description: Export format
+          schema:
+            type: string
+            enum: [json, csv, pdf]
+      responses:
+        '200':
+          description: Export file
+          content:
+            application/json:
+              schema:
+                type: object
+            text/csv:
+              schema:
+                type: string
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /preferences:
+    get:
+      tags:
+        - Preferences
+      summary: Get preferences
+      description: Retrieve user preferences
+      operationId: getPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Preferences retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Preferences
+      summary: Update preferences
+      description: Update user preferences
+      operationId: updatePreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferencesUpdate'
+      responses:
+        '200':
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserRegistration:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+
+    UserLogin:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+
+    AuthToken:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [bearer]
+        user:
+          $ref: '#/components/schemas/User'
+
+    EvaluationConfig:
+      type: object
+      required:
+        - judge_models
+        - enable_retrieval
+        - aggregation_strategy
+      properties:
+        judge_models:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        enable_retrieval:
+          type: boolean
+        aggregation_strategy:
+          type: string
+          enum: [mean, median, weighted_average]
+
+    EvaluationCreate:
+      type: object
+      required:
+        - source_text
+        - candidate_output
+        - config
+      properties:
+        source_text:
+          type: string
+          minLength: 1
+        candidate_output:
+          type: string
+          minLength: 1
+        config:
+          $ref: '#/components/schemas/EvaluationConfig'
+
+    EvaluationCreated:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending]
+        websocket_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+
+    EvaluationSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_text_preview:
+          type: string
+        candidate_output_preview:
+          type: string
+        consensus_score:
+          type: number
+          format: float
+          nullable: true
+        hallucination_score:
+          type: number
+          format: float
+          nullable: true
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+
+    EvaluationList:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvaluationSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        has_more:
+          type: boolean
+
+    FlaggedIssue:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [factual_error, hallucination, unsupported_claim, temporal_inconsistency, numerical_error, bias]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        description:
+          type: string
+        evidence:
+          type: object
+        text_span_start:
+          type: integer
+          nullable: true
+        text_span_end:
+          type: integer
+          nullable: true
+
+    JudgeResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        judge_name:
+          type: string
+        score:
+          type: number
+          format: float
+        confidence:
+          type: number
+          format: float
+        reasoning:
+          type: string
+        flagged_issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlaggedIssue'
+        response_time_ms:
+          type: integer
+
+    VerifierVerdict:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        claim_text:
+          type: string
+        label:
+          type: string
+          enum: [SUPPORTED, REFUTED, NOT_ENOUGH_INFO]
+        confidence:
+          type: number
+          format: float
+        evidence:
+          type: object
+        reasoning:
+          type: string
+
+    EvaluationMetrics:
+      type: object
+      properties:
+        variance:
+          type: number
+          format: float
+        standard_deviation:
+          type: number
+          format: float
+        processing_time_ms:
+          type: integer
+
+    EvaluationDetail:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        source_text:
+          type: string
+        candidate_output:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+        consensus_score:
+          type: number
+          format: float
+          nullable: true
+        hallucination_score:
+          type: number
+          format: float
+          nullable: true
+        confidence_interval_lower:
+          type: number
+          format: float
+          nullable: true
+        confidence_interval_upper:
+          type: number
+          format: float
+          nullable: true
+        inter_judge_agreement:
+          type: number
+          format: float
+          nullable: true
+        judge_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/JudgeResult'
+        verifier_verdicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerifierVerdict'
+        metrics:
+          $ref: '#/components/schemas/EvaluationMetrics'
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    UserPreferences:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        default_judge_models:
+          type: array
+          items:
+            type: string
+        default_retrieval_enabled:
+          type: boolean
+        default_aggregation_strategy:
+          type: string
+          enum: [mean, median, weighted_average]
+        theme:
+          type: string
+          enum: [light, dark]
+        notifications_enabled:
+          type: boolean
+
+    UserPreferencesUpdate:
+      type: object
+      properties:
+        default_judge_models:
+          type: array
+          items:
+            type: string
+        default_retrieval_enabled:
+          type: boolean
+        default_aggregation_strategy:
+          type: string
+          enum: [mean, median, weighted_average]
+        theme:
+          type: string
+          enum: [light, dark]
+        notifications_enabled:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        request_id:
+          type: string
+          format: uuid
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: bad_request
+            message: Invalid request data
+            details: {}
+            request_id: abc-123
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: unauthorized
+            message: Invalid or expired token
+            details: {}
+            request_id: def-456
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: forbidden
+            message: Insufficient permissions
+            details: {}
+            request_id: ghi-789
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: not_found
+            message: Resource not found
+            details: {}
+            request_id: jkl-012
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: conflict
+            message: Username already exists
+            details:
+              field: username
+            request_id: mno-345
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: validation_error
+            message: Invalid input data
+            details:
+              source_text: ["Field is required"]
+              config.judge_models: ["Must contain at least one judge model"]
+            request_id: pqr-678

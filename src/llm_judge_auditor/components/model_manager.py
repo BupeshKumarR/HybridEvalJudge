@@ -91,6 +91,12 @@ class ModelManager:
         # Model info tracking
         self._model_info: Dict[str, ModelInfo] = {}
         
+        # Model loading cache to avoid redundant downloads
+        self._model_path_cache: Dict[str, Path] = {}
+        
+        # Lazy loading flag
+        self._lazy_loading = True
+        
         logger.info(f"ModelManager initialized with device: {self.config.device}")
 
     def _get_device_string(self) -> str:
@@ -150,6 +156,39 @@ class ModelManager:
         else:
             return 5 * 1024**3  # Default 5GB
 
+    def _get_or_download_model(self, model_name: str) -> Path:
+        """
+        Get model path from cache or download if needed.
+
+        This method optimizes model loading by caching model paths
+        to avoid redundant lookups and downloads.
+
+        Args:
+            model_name: Model identifier
+
+        Returns:
+            Path to the model directory
+
+        Raises:
+            RuntimeError: If model download fails
+        """
+        # Check in-memory cache first
+        if model_name in self._model_path_cache:
+            logger.debug(f"Using cached path for {model_name}")
+            return self._model_path_cache[model_name]
+
+        # Check if model is already downloaded
+        model_path = self.model_downloader.get_model_path(model_name)
+        
+        if model_path is None:
+            logger.info(f"Model not cached, downloading: {model_name}")
+            model_path = self.model_downloader.download_model(model_name)
+
+        # Cache the path
+        self._model_path_cache[model_name] = model_path
+        
+        return model_path
+
     def load_verifier(
         self,
         model_name: Optional[str] = None,
@@ -192,11 +231,8 @@ class ModelManager:
         try:
             logger.info(f"Loading verifier model: {model_name}")
             
-            # Download model if needed
-            model_path = self.model_downloader.get_model_path(model_name)
-            if model_path is None:
-                logger.info(f"Model not cached, downloading: {model_name}")
-                model_path = self.model_downloader.download_model(model_name)
+            # Get or download model with optimized caching
+            model_path = self._get_or_download_model(model_name)
 
             # Get device and quantization config
             device = self._get_device_string()
@@ -321,11 +357,8 @@ class ModelManager:
             try:
                 logger.info(f"Loading judge model: {model_name}")
                 
-                # Download model if needed
-                model_path = self.model_downloader.get_model_path(model_name)
-                if model_path is None:
-                    logger.info(f"Model not cached, downloading: {model_name}")
-                    model_path = self.model_downloader.download_model(model_name)
+                # Get or download model with optimized caching
+                model_path = self._get_or_download_model(model_name)
 
                 # Get device and quantization config
                 device = self._get_device_string()

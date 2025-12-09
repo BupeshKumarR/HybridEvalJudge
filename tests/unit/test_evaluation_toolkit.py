@@ -66,7 +66,9 @@ def mock_components():
          patch("llm_judge_auditor.evaluation_toolkit.SpecializedVerifier") as mock_sv, \
          patch("llm_judge_auditor.evaluation_toolkit.PromptManager") as mock_pm, \
          patch("llm_judge_auditor.evaluation_toolkit.JudgeEnsemble") as mock_je, \
-         patch("llm_judge_auditor.evaluation_toolkit.AggregationEngine") as mock_ae:
+         patch("llm_judge_auditor.evaluation_toolkit.AggregationEngine") as mock_ae, \
+         patch("llm_judge_auditor.components.api_key_manager.APIKeyManager") as mock_akm, \
+         patch("llm_judge_auditor.components.api_judge_ensemble.APIJudgeEnsemble") as mock_aje:
         
         # Configure ModelManager mock
         mock_mm_instance = MagicMock()
@@ -76,6 +78,9 @@ def mock_components():
             "test-judge-1": (MagicMock(), MagicMock()),
         }
         mock_mm_instance.get_model_info.return_value = {"verifier": "test-verifier"}
+        # Make load_verifier and load_judge succeed silently
+        mock_mm_instance.load_verifier.return_value = None
+        mock_mm_instance.load_judge.return_value = None
         mock_mm.return_value = mock_mm_instance
         
         # Configure RetrievalComponent mock
@@ -118,6 +123,9 @@ def mock_components():
                 confidence=0.85,
             ),
         ]
+        mock_je_instance.get_judge_count.return_value = 2
+        # Ensure the mock doesn't raise exceptions during initialization
+        mock_je.side_effect = None
         mock_je.return_value = mock_je_instance
         
         # Configure AggregationEngine mock
@@ -135,6 +143,21 @@ def mock_components():
         )
         mock_ae.return_value = mock_ae_instance
         
+        # Configure APIKeyManager mock (with API keys available for tests)
+        mock_akm_instance = MagicMock()
+        mock_akm_instance.groq_key = "mock-groq-key"
+        mock_akm_instance.gemini_key = "mock-gemini-key"
+        mock_akm_instance.has_any_keys.return_value = True
+        mock_akm_instance.load_keys.return_value = {"groq": True, "gemini": True}
+        mock_akm_instance.get_setup_instructions.return_value = "Mock setup instructions"
+        mock_akm.return_value = mock_akm_instance
+        
+        # Configure APIJudgeEnsemble mock (used when keys are available)
+        mock_aje_instance = MagicMock()
+        mock_aje_instance.get_judge_count.return_value = 2
+        mock_aje_instance.get_judge_names.return_value = ["groq-llama", "gemini-flash"]
+        mock_aje.return_value = mock_aje_instance
+        
         yield {
             "model_manager": mock_mm_instance,
             "retrieval": mock_rc_instance,
@@ -142,6 +165,8 @@ def mock_components():
             "prompt_manager": mock_pm_instance,
             "judge_ensemble": mock_je_instance,
             "aggregation": mock_ae_instance,
+            "api_key_manager": mock_akm_instance,
+            "api_judge_ensemble": mock_aje_instance,
         }
 
 
@@ -160,11 +185,12 @@ class TestEvaluationToolkitInitialization:
         assert toolkit.judge_ensemble is not None
         assert toolkit.aggregation is not None
 
-    def test_initialization_verifies_models(self, mock_config, mock_components):
-        """Test that initialization verifies all models are ready."""
+    def test_initialization_loads_api_keys(self, mock_config, mock_components):
+        """Test that initialization loads API keys."""
         toolkit = EvaluationToolkit(mock_config)
         
-        mock_components["model_manager"].verify_models_ready.assert_called_once()
+        # Verify API key manager was initialized
+        mock_components["api_key_manager"].load_keys.assert_called_once()
 
     def test_initialization_failure_raises_error(self, mock_config):
         """Test that initialization failure raises RuntimeError."""

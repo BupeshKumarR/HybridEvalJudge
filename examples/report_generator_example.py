@@ -4,8 +4,11 @@ Example demonstrating the ReportGenerator component.
 This example shows how to:
 1. Generate evaluation reports
 2. Export reports to JSON format
-3. Export reports to Markdown format
-4. Export reports to plain text format
+3. Export reports to CSV format
+4. Export reports to Markdown format
+5. Export reports to plain text format
+6. Generate retrieval provenance summaries
+7. Generate hallucination summaries
 """
 
 from pathlib import Path
@@ -162,6 +165,32 @@ def main():
     print(f"✓ Text report saved to: {txt_path}")
     print()
 
+    # Export to CSV
+    print("Exporting report to CSV...")
+    csv_path = output_dir / "evaluation_report.csv"
+    generator.export_csv(report, str(csv_path))
+    print(f"✓ CSV report saved to: {csv_path}")
+    print()
+
+    # Get retrieval provenance summary
+    print("Generating retrieval provenance summary...")
+    provenance_summary = generator.get_retrieval_provenance_summary(report)
+    print(f"✓ Retrieved {provenance_summary['total_passages']} passages from {len(provenance_summary['sources'])} sources")
+    print(f"  - Average relevance score: {provenance_summary['avg_relevance_score']:.4f}")
+    print(f"  - Min relevance score: {provenance_summary['min_relevance_score']:.4f}")
+    print(f"  - Max relevance score: {provenance_summary['max_relevance_score']:.4f}")
+    print()
+
+    # Get hallucination summary
+    print("Generating hallucination summary...")
+    hallucination_summary = generator.get_hallucination_summary(report)
+    print(f"✓ Found {hallucination_summary['total_hallucinations']} total hallucinations")
+    print(f"  - Severity distribution:")
+    for severity, count in hallucination_summary['severity_distribution'].items():
+        if count > 0:
+            print(f"    - {severity.title()}: {count}")
+    print()
+
     # Display report summary
     print("=" * 60)
     print("Report Summary")
@@ -200,6 +229,7 @@ def main():
     print()
     print("Check the output directory for the generated reports:")
     print(f"  - JSON: {json_path}")
+    print(f"  - CSV: {csv_path}")
     print(f"  - Markdown: {md_path}")
     print(f"  - Text: {txt_path}")
 

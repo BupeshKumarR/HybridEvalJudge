@@ -1,0 +1,48 @@
+EVALUATION SUMMARY
+Metric,Value
+Timestamp,2024-01-01T12:00:00
+Task,factual_accuracy
+Criteria,correctness
+Consensus Score,77.50
+Confidence,0.85
+Disagreement Level,2.50
+Retrieval Enabled,True
+Verifier Model,minicheck-flan-t5-large
+Judge Models,"llama-3-8b, mistral-7b"
+Aggregation Strategy,mean
+
+INDIVIDUAL JUDGE SCORES
+Judge Model,Score
+llama-3-8b,75.00
+mistral-7b,80.00
+
+VERIFIER VERDICTS
+Verdict #,Label,Confidence,Reasoning,Evidence
+1,SUPPORTED,0.90,The claim is directly supported by the source text.,The source text confirms this claim.
+2,REFUTED,0.85,The claim contradicts information in the source text.,The source text contradicts this claim.
+
+RETRIEVAL PROVENANCE
+Passage #,Source,Relevance Score,Text
+1,Wikipedia:Paris,0.9500,Paris is the capital and most populous city of France.
+2,Wikipedia:France,0.8800,France is a country primarily located in Western Europe.
+
+FLAGGED ISSUES
+Issue #,Type,Severity,Description,Evidence
+1,hallucination,high,Refuted claim: The claim contradicts information in the source text.,The source text contradicts this claim.
+2,numerical_error,medium,Population figure is incorrect,"Source states 2.1 million, candidate states 3 million"
+
+HALLUCINATION CATEGORIES
+Category,Count
+Factual Error,1
+Unsupported Claim,0
+Temporal Inconsistency,0
+Numerical Error,1
+Bias,0
+Inconsistency,0
+Other,0
+
+CHAIN-OF-THOUGHT REASONING
+Judge Model,Reasoning
+llama-3-8b,"The candidate output contains mostly accurate information about Paris and France. However, there is one factual error regarding the population figure."
+mistral-7b,"The output is generally accurate and well-structured. Minor issues with specificity in some claims, but overall factually sound."
+

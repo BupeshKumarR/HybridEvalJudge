@@ -466,9 +466,12 @@ from llm_judge_auditor.components import ReportGenerator
 
 **Methods**:
 - `generate_report(evaluation: EvaluationResult) -> Report`: Generate report
-- `export_json(report: Report, path: str) -> None`: Export to JSON
-- `export_csv(reports: List[Report], path: str) -> None`: Export to CSV
-- `export_text(report: Report, path: str) -> None`: Export to text
+- `export_json(report: Report, path: str, indent: Optional[int] = 2) -> None`: Export to JSON
+- `export_csv(report: Report, path: str) -> None`: Export to CSV with detailed sections
+- `export_markdown(report: Report, path: str) -> None`: Export to Markdown
+- `export_text(report: Report, path: str) -> None`: Export to plain text
+- `get_retrieval_provenance_summary(report: Report) -> Dict[str, Any]`: Get detailed retrieval provenance summary
+- `get_hallucination_summary(report: Report) -> Dict[str, Any]`: Get detailed hallucination categorization summary
 
 ## Utilities
 
@@ -570,3 +573,260 @@ def evaluate_text(
 - [CLI Reference](CLI_USAGE.md)
 - [Configuration Guide](../config/README.md)
 - [Examples](../examples/)
+
+
+## PluginRegistry
+
+Registry for managing custom plugins (verifiers, judges, aggregators).
+
+```python
+from llm_judge_auditor.components import PluginRegistry
+```
+
+### Constructor
+
+```python
+PluginRegistry(plugins_dir: Optional[str] = None)
+```
+
+**Parameters**:
+- `plugins_dir` (Optional[str]): Path to plugins directory for auto-discovery
+
+**Example**:
+```python
+# Create registry with auto-discovery
+registry = PluginRegistry(plugins_dir="plugins")
+
+# Or create empty registry
+registry = PluginRegistry()
+```
+
+### Methods
+
+#### `register_verifier(name, loader, version="1.0.0", description="", author="", compatible_versions=None)`
+
+Register a custom verifier plugin.
+
+**Parameters**:
+- `name` (str): Unique name for the verifier
+- `loader` (Callable): Function that returns a verifier instance
+- `version` (str): Version string (default: "1.0.0")
+- `description` (str): Optional description
+- `author` (str): Optional author information
+- `compatible_versions` (Optional[List[str]]): Compatible toolkit versions
+
+**Example**:
+```python
+def load_my_verifier():
+    return MyCustomVerifier()
+
+registry.register_verifier("my_verifier", load_my_verifier, version="1.0.0")
+```
+
+#### `register_judge(name, loader, version="1.0.0", description="", author="", compatible_versions=None)`
+
+Register a custom judge plugin.
+
+**Parameters**:
+- `name` (str): Unique name for the judge
+- `loader` (Callable): Function that returns a judge instance
+- `version` (str): Version string (default: "1.0.0")
+- `description` (str): Optional description
+- `author` (str): Optional author information
+- `compatible_versions` (Optional[List[str]]): Compatible toolkit versions
+
+**Example**:
+```python
+def load_my_judge():
+    return MyCustomJudge()
+
+registry.register_judge("my_judge", load_my_judge, version="1.0.0")
+```
+
+#### `register_aggregator(name, aggregator, version="1.0.0", description="", author="", compatible_versions=None)`
+
+Register a custom aggregation strategy.
+
+**Parameters**:
+- `name` (str): Unique name for the aggregator
+- `aggregator` (Callable[[List[float]], float]): Function that aggregates scores
+- `version` (str): Version string (default: "1.0.0")
+- `description` (str): Optional description
+- `author` (str): Optional author information
+- `compatible_versions` (Optional[List[str]]): Compatible toolkit versions
+
+**Example**:
+```python
+def harmonic_mean(scores):
+    return len(scores) / sum(1/s for s in scores if s > 0)
+
+registry.register_aggregator("harmonic_mean", harmonic_mean)
+```
+
+#### `get_verifier(name: str) -> Any`
+
+Get a verifier plugin instance.
+
+**Parameters**:
+- `name` (str): Name of the verifier
+
+**Returns**: Verifier instance
+
+**Raises**: KeyError if verifier not registered
+
+#### `get_judge(name: str) -> Any`
+
+Get a judge plugin instance.
+
+**Parameters**:
+- `name` (str): Name of the judge
+
+**Returns**: Judge instance
+
+**Raises**: KeyError if judge not registered
+
+#### `get_aggregator(name: str) -> Callable[[List[float]], float]`
+
+Get an aggregator plugin function.
+
+**Parameters**:
+- `name` (str): Name of the aggregator
+
+**Returns**: Aggregator function
+
+**Raises**: KeyError if aggregator not registered
+
+#### `list_plugins() -> Dict[str, List[str]]`
+
+List all registered plugins by type.
+
+**Returns**: Dictionary mapping plugin types to lists of plugin names
+
+**Example**:
+```python
+plugins = registry.list_plugins()
+print(plugins)
+# {'verifiers': ['custom_verifier'], 'judges': ['custom_judge'], 'aggregators': ['harmonic_mean']}
+```
+
+#### `get_plugin_info(name: str) -> Optional[PluginMetadata]`
+
+Get metadata for a specific plugin.
+
+**Parameters**:
+- `name` (str): Name of the plugin
+
+**Returns**: PluginMetadata if found, None otherwise
+
+#### `discover_plugins(plugins_dir: str) -> Dict[str, int]`
+
+Discover and load plugins from a directory.
+
+**Parameters**:
+- `plugins_dir` (str): Path to the plugins directory
+
+**Returns**: Dictionary with counts of discovered plugins by type
+
+**Example**:
+```python
+discovered = registry.discover_plugins("plugins")
+print(f"Discovered {discovered['verifiers']} verifiers")
+```
+
+#### `check_compatibility(plugin_name: str, toolkit_version: str) -> bool`
+
+Check if a plugin is compatible with the current toolkit version.
+
+**Parameters**:
+- `plugin_name` (str): Name of the plugin
+- `toolkit_version` (str): Current toolkit version string
+
+**Returns**: True if compatible, False otherwise
+
+#### `unregister_verifier(name: str)`
+
+Unregister a verifier plugin.
+
+#### `unregister_judge(name: str)`
+
+Unregister a judge plugin.
+
+#### `unregister_aggregator(name: str)`
+
+Unregister an aggregator plugin.
+
+#### `clear_all()`
+
+Clear all registered plugins.
+
+### Plugin Interfaces
+
+#### Verifier Protocol
+
+Custom verifiers should implement:
+
+```python
+class CustomVerifier:
+    def verify_statement(
+        self, 
+        statement: str, 
+        context: str, 
+        passages: Optional[List[Any]] = None
+    ) -> Verdict:
+        """Verify a single statement."""
+        pass
+    
+    def batch_verify(
+        self,
+        statements: List[str],
+        contexts: List[str],
+        passages_list: Optional[List[List[Any]]] = None
+    ) -> List[Verdict]:
+        """Verify multiple statements."""
+        pass
+```
+
+#### Judge Protocol
+
+Custom judges should implement:
+
+```python
+class CustomJudge:
+    def evaluate(
+        self, 
+        source_text: str, 
+        candidate_output: str, 
+        retrieved_context: str = ""
+    ) -> JudgeResult:
+        """Evaluate a candidate output."""
+        pass
+```
+
+#### Aggregator Protocol
+
+Custom aggregators should be callable functions:
+
+```python
+def custom_aggregator(scores: List[float]) -> float:
+    """Aggregate multiple scores into a single consensus score."""
+    pass
+```
+
+### Plugin Discovery
+
+Plugins are automatically discovered from Python modules in the plugins directory. Each plugin module should define a `register_plugin(registry)` function:
+
+```python
+# plugins/my_plugin.py
+
+def register_plugin(registry):
+    """Register custom components."""
+    
+    def load_my_verifier():
+        return MyVerifier()
+    
+    registry.register_verifier("my_verifier", load_my_verifier)
+```
+
+See `plugins/README.md` and `examples/plugin_system_example.py` for more details.
+

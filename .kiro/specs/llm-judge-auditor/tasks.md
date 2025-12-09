@@ -31,7 +31,7 @@
   - Handle network errors and retry logic
   - _Requirements: 1.1, 1.2_
 
-- [ ]* 3.2 Write property test for model initialization
+- [x] 3.2 Write property test for model initialization
   - **Property 1: Model initialization completeness**
   - **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5**
 
@@ -54,7 +54,7 @@
   - Add zero-retrieval fallback mode
   - _Requirements: 6.1, 6.2, 6.3, 6.5, 6.6, 6.7_
 
-- [ ]* 6.1 Write property test for retrieval fallback
+- [x] 6.1 Write property test for retrieval fallback
   - **Property 13: Retrieval fallback behavior**
   - **Validates: Requirements 6.5, 6.6, 6.7**
 
@@ -79,11 +79,11 @@
   - Extract scores (0-100) and reasoning from judge outputs
   - _Requirements: 2.3, 2.4, 4.1, 4.2, 4.3_
 
-- [ ]* 9.1 Write property test for score bounds
+- [x] 9.1 Write property test for score bounds
   - **Property 3: Score bounds validity**
   - **Validates: Requirements 2.4**
 
-- [ ]* 9.2 Write property test for pairwise symmetry
+- [x] 9.2 Write property test for pairwise symmetry
   - **Property 8: Pairwise ranking symmetry**
   - **Validates: Requirements 10.2**
 
@@ -94,7 +94,7 @@
   - Report individual scores alongside consensus
   - _Requirements: 2.5, 11.1, 11.2, 11.3, 11.4_
 
-- [ ]* 10.1 Write property test for aggregation correctness
+- [x] 10.1 Write property test for aggregation correctness
   - **Property 24: Ensemble aggregation correctness**
   - **Validates: Requirements 11.1, 11.2, 11.3, 11.4**
 
@@ -112,7 +112,7 @@
   - Ensure correct execution order and data flow
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
-- [ ]* 12.1 Write property test for pipeline correctness
+- [x] 12.1 Write property test for pipeline correctness
   - **Property 2: Multi-stage pipeline correctness**
   - **Validates: Requirements 2.1, 2.2, 2.3, 2.5**
 
@@ -160,77 +160,77 @@
   - Create README with installation and usage instructions
   - _Requirements: All_
 
-- [ ] 20. Checkpoint - Ensure all tests pass
+- [x] 20. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 21. Basic integration testing
+- [x] 21. Basic integration testing
   - Test full pipeline end-to-end with all components
   - Test both presets (fast, balanced)
   - Test error handling scenarios
   - Verify core property tests pass with 100+ iterations
   - _Requirements: All_
 
-- [ ] 22. Final Checkpoint - Ensure all tests pass
+- [x] 22. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ---
 
 ## Optional Tasks (Phase 2 / Future Enhancements)
 
-- [ ]* 23. Implement Streaming Evaluator for large documents
+- [x] 23. Implement Streaming Evaluator for large documents
   - Create StreamingEvaluator class with chunking support
   - Implement incremental processing of document streams
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ]* 24. Implement Plugin System
+- [x] 24. Implement Plugin System
   - Create PluginRegistry class with registration methods
   - Implement plugin discovery from plugins/ directory
   - Support custom verifiers, judges, and aggregators
   - _Requirements: 7.2_
 
-- [ ]* 25. Implement Adversarial Test Harness
+- [x] 25. Implement Adversarial Test Harness
   - Create AdversarialTester class with perturbation generation
   - Implement perturbation types (date_shift, location_swap, number_change)
   - Generate robustness reports with detection rates
   - _Requirements: 14.1, 14.2, 14.5_
 
-- [ ]* 26. Implement reliability validation features
+- [x] 26. Implement reliability validation features
   - Add evaluation consistency checking (variance < 5 points)
   - Implement Cohen's kappa calculation for inter-model agreement
   - Add Kendall's Tau and Spearman correlation for ranking validation
   - _Requirements: 10.1, 10.4, 10.5_
 
-- [ ]* 27. Implement component performance tracking
+- [x] 27. Implement component performance tracking
   - Add separate metrics tracking for verifier and judge ensemble
   - Track accuracy, latency, and confidence for each component
   - Log disagreements between verifier and judges
   - _Requirements: 13.1, 13.2, 13.3_
 
-- [ ]* 28. Implement fine-tuning support for specialized verifiers
+- [x] 28. Implement fine-tuning support for specialized verifiers
   - Create VerifierTrainer class for fine-tuning small models
   - Support FEVER and custom training data formats
   - Implement binary/ternary classification training
   - _Requirements: 12.1, 12.2, 12.3_
 
-- [ ]* 29. Set up benchmark validation
+- [x] 29. Set up benchmark validation
   - Download FEVER dataset
   - Download TruthfulQA dataset
   - Implement benchmark evaluation scripts
   - Run validation and compare to baselines
   - _Requirements: 10.3_
 
-- [ ]* 30. Advanced reporting features
+- [x] 30. Advanced reporting features
   - Add CSV export format
   - Implement retrieval provenance tracking
   - Categorize hallucinations by type
   - _Requirements: 8.3, 8.7, 8.8_
 
-- [ ]* 31. Implement Claim Router for specialized judge selection
+- [x] 31. Implement Claim Router for specialized judge selection
   - Create ClaimRouter class with claim type classification
   - Implement routing logic to match claims to specialized judges
   - _Requirements: 2.3_
 
-- [ ]* 32. Performance optimization
+- [x] 32. Performance optimization
   - Profile code to identify bottlenecks
   - Optimize model loading and caching
   - Add parallel processing for judge ensemble

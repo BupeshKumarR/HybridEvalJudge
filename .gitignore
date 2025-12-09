@@ -25,7 +25,13 @@ venv/
 env/
 ENV/
 .venv
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
 *.env
+!.env.example
 
 # Testing
 .pytest_cache/
@@ -51,10 +57,18 @@ models/
 data/
 *.db
 *.sqlite
+*.sqlite3
 
 # Logs
 *.log
 logs/
+
+# API Keys and Secrets
+**/api_keys.txt
+**/secrets.txt
+**/.secrets/
+**/credentials.json
+!**/credentials.example.json
 
 # OS
 .DS_Store
@@ -62,3 +76,8 @@ Thumbs.db
 
 # Project specific
 config/local_*.yaml
+.kiro/specs/llm-judge-auditor
+
+# Benchmarks
+benchmarks/
+!benchmarks/.gitkeep

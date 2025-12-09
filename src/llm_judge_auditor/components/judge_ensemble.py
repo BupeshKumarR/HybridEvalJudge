@@ -536,16 +536,22 @@ class JudgeEnsemble:
         source_text: str,
         candidate_output: str,
         retrieved_context: str = "",
+        parallel: bool = False,
+        max_workers: Optional[int] = None,
     ) -> List[JudgeResult]:
         """
         Evaluate using all loaded judge models (ensemble evaluation).
 
-        This method processes judges sequentially, collecting results from each.
+        This method can process judges either sequentially or in parallel.
+        Parallel processing can significantly speed up evaluation when multiple
+        judges are used, especially on systems with multiple CPU cores or GPUs.
 
         Args:
             source_text: Reference document or context
             candidate_output: Text to be evaluated
             retrieved_context: Optional retrieved passages for context
+            parallel: If True, evaluate judges in parallel (default: False)
+            max_workers: Maximum number of parallel workers (default: number of judges)
 
         Returns:
             List of JudgeResult objects, one per judge
@@ -555,9 +561,16 @@ class JudgeEnsemble:
 
         Example:
             >>> ensemble = JudgeEnsemble(model_manager)
+            >>> # Sequential evaluation
             >>> results = ensemble.evaluate_all(
             ...     "Paris is the capital of France.",
             ...     "Paris is the capital of Germany."
+            ... )
+            >>> # Parallel evaluation (faster)
+            >>> results = ensemble.evaluate_all(
+            ...     "Paris is the capital of France.",
+            ...     "Paris is the capital of Germany.",
+            ...     parallel=True
             ... )
             >>> for result in results:
             ...     print(f"{result.model_name}: {result.score}")
@@ -570,8 +583,40 @@ class JudgeEnsemble:
                 "No judge models loaded. Please load judge models before evaluation."
             )
 
-        logger.info(f"Starting ensemble evaluation with {len(judges)} judges")
+        logger.info(f"Starting ensemble evaluation with {len(judges)} judges (parallel={parallel})")
 
+        if parallel:
+            return self._evaluate_all_parallel(
+                source_text=source_text,
+                candidate_output=candidate_output,
+                retrieved_context=retrieved_context,
+                max_workers=max_workers,
+            )
+        else:
+            return self._evaluate_all_sequential(
+                source_text=source_text,
+                candidate_output=candidate_output,
+                retrieved_context=retrieved_context,
+            )
+
+    def _evaluate_all_sequential(
+        self,
+        source_text: str,
+        candidate_output: str,
+        retrieved_context: str = "",
+    ) -> List[JudgeResult]:
+        """
+        Evaluate using all judges sequentially.
+
+        Args:
+            source_text: Reference document or context
+            candidate_output: Text to be evaluated
+            retrieved_context: Optional retrieved passages for context
+
+        Returns:
+            List of JudgeResult objects, one per judge
+        """
+        judges = self.model_manager.get_all_judges()
         results = []
         failed_judges = []
 
@@ -606,6 +651,84 @@ class JudgeEnsemble:
             )
         else:
             logger.info(f"Ensemble evaluation completed successfully with {len(results)} judges")
+
+        return results
+
+    def _evaluate_all_parallel(
+        self,
+        source_text: str,
+        candidate_output: str,
+        retrieved_context: str = "",
+        max_workers: Optional[int] = None,
+    ) -> List[JudgeResult]:
+        """
+        Evaluate using all judges in parallel.
+
+        This method uses ThreadPoolExecutor to evaluate multiple judges
+        concurrently, which can significantly speed up evaluation.
+
+        Args:
+            source_text: Reference document or context
+            candidate_output: Text to be evaluated
+            retrieved_context: Optional retrieved passages for context
+            max_workers: Maximum number of parallel workers
+
+        Returns:
+            List of JudgeResult objects, one per judge
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        judges = self.model_manager.get_all_judges()
+        
+        # Default to number of judges if max_workers not specified
+        if max_workers is None:
+            max_workers = len(judges)
+
+        results = []
+        failed_judges = []
+
+        # Create a thread pool for parallel evaluation
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all judge evaluations
+            future_to_judge = {
+                executor.submit(
+                    self.evaluate_single,
+                    judge_name=judge_name,
+                    source_text=source_text,
+                    candidate_output=candidate_output,
+                    retrieved_context=retrieved_context,
+                ): judge_name
+                for judge_name in judges.keys()
+            }
+
+            # Collect results as they complete
+            for future in as_completed(future_to_judge):
+                judge_name = future_to_judge[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    logger.debug(f"Judge {judge_name} completed successfully")
+                except Exception as e:
+                    logger.error(f"Judge {judge_name} failed: {e}")
+                    failed_judges.append((judge_name, str(e)))
+
+        # If all judges failed, raise an error
+        if not results:
+            error_details = "\n".join(
+                f"  - {name}: {error}" for name, error in failed_judges
+            )
+            raise RuntimeError(
+                f"All judge evaluations failed. Errors:\n{error_details}"
+            )
+
+        # If some judges failed, log a warning
+        if failed_judges:
+            logger.warning(
+                f"Parallel ensemble evaluation completed with {len(results)}/{len(judges)} judges. "
+                f"Failed judges: {[name for name, _ in failed_judges]}"
+            )
+        else:
+            logger.info(f"Parallel ensemble evaluation completed successfully with {len(results)} judges")
 
         return results
 
