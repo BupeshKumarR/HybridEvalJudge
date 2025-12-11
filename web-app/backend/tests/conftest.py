@@ -204,3 +204,34 @@ def test_evaluation_session(db_session, created_user):
     db_session.commit()
     db_session.refresh(session)
     return session
+
+
+@pytest.fixture
+def test_chat_session(db_session, created_user):
+    """Create a test chat session."""
+    from app.models import ChatSession
+    
+    session = ChatSession(
+        user_id=created_user.id,
+        ollama_model="llama3.2"
+    )
+    db_session.add(session)
+    db_session.commit()
+    db_session.refresh(session)
+    return session
+
+
+@pytest.fixture
+def test_chat_message(db_session, test_chat_session):
+    """Create a test chat message."""
+    from app.models import ChatMessage
+    
+    message = ChatMessage(
+        session_id=test_chat_session.id,
+        role="user",
+        content="What is the capital of France?"
+    )
+    db_session.add(message)
+    db_session.commit()
+    db_session.refresh(message)
+    return message

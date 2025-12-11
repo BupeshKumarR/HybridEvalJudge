@@ -21,18 +21,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, showSidebar = true })
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       <Navbar
         onToggleSidebar={toggleSidebar}
         onToggleMobileMenu={toggleMobileMenu}
         showSidebarToggle={showSidebar}
       />
       
-      <div className="flex">
+      <div className="flex flex-1 overflow-hidden">
         {showSidebar && (
           <>
             {/* Desktop Sidebar */}
-            <div className="hidden lg:block">
+            <div className="hidden lg:block h-full">
               <Sidebar isOpen={true} onClose={() => {}} />
             </div>
             
@@ -51,7 +51,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, showSidebar = true })
           </>
         )}
         
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-hidden">
           {children}
         </main>
       </div>

@@ -1,7 +1,7 @@
 """
 User preferences API endpoints.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
@@ -10,6 +10,7 @@ from ..database import get_db
 from ..models import User, UserPreference
 from ..schemas import UserPreferenceResponse, UserPreferenceUpdate
 from ..auth import get_current_user
+from ..audit_log import audit_logger, AuditEventType
 
 router = APIRouter(prefix="/api/v1/preferences", tags=["preferences"])
 
@@ -47,6 +48,7 @@ async def get_user_preferences(
 
 @router.put("", response_model=UserPreferenceResponse)
 async def update_user_preferences(
+    request: Request,
     preferences_update: UserPreferenceUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -55,10 +57,24 @@ async def update_user_preferences(
     Update current user's preferences.
     Creates preferences if they don't exist.
     """
+    # Get client IP for audit logging
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    
     # Get or create preferences
     preferences = db.query(UserPreference).filter(
         UserPreference.user_id == current_user.id
     ).first()
+    
+    # Store old values for audit log
+    old_values = {}
+    if preferences:
+        old_values = {
+            "default_judge_models": preferences.default_judge_models,
+            "default_retrieval_enabled": preferences.default_retrieval_enabled,
+            "default_aggregation_strategy": preferences.default_aggregation_strategy,
+            "theme": preferences.theme,
+            "notifications_enabled": preferences.notifications_enabled
+        }
     
     if not preferences:
         # Create new preferences with provided values
@@ -79,6 +95,27 @@ async def update_user_preferences(
     
     db.commit()
     db.refresh(preferences)
+    
+    # Log configuration changes
+    new_values = {
+        "default_judge_models": preferences.default_judge_models,
+        "default_retrieval_enabled": preferences.default_retrieval_enabled,
+        "default_aggregation_strategy": preferences.default_aggregation_strategy,
+        "theme": preferences.theme,
+        "notifications_enabled": preferences.notifications_enabled
+    }
+    
+    audit_logger.log_event(
+        event_type=AuditEventType.PREFERENCES_UPDATE,
+        user_id=str(current_user.id),
+        username=current_user.username,
+        ip_address=client_ip,
+        details={
+            "old_values": old_values,
+            "new_values": new_values,
+            "changes": preferences_update.model_dump(exclude_unset=True)
+        }
+    )
     
     return preferences
 

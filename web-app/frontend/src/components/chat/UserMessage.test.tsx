@@ -38,7 +38,7 @@ describe('UserMessage', () => {
 
     render(<UserMessage {...propsWithWhitespace} />);
     
-    const sourceElement = screen.getByText((content, element) => {
+    const sourceElement = screen.getByText((_content, element) => {
       return element?.textContent === 'Line 1\nLine 2\nLine 3';
     });
     expect(sourceElement).toHaveClass('whitespace-pre-wrap');

@@ -5,6 +5,29 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * Metadata for an evaluation including model info and timestamps
+ * Requirements: 10.1, 10.2, 10.3
+ */
+export interface EvaluationMetadata {
+  /** Ollama model name used for generation */
+  ollamaModel: string;
+  /** Ollama model version (if available) */
+  ollamaVersion?: string;
+  /** List of judge models used for evaluation */
+  judgeModels: string[];
+  /** Timestamp when generation started */
+  generationTimestamp?: string;
+  /** Timestamp when evaluation completed */
+  evaluationTimestamp?: string;
+  /** Generation parameters (optional) */
+  generationParams?: {
+    temperature?: number;
+    topP?: number;
+    maxTokens?: number;
+  };
+}
+
 export interface LoginResponse {
   access_token: string;
   token_type: string;
@@ -58,6 +81,22 @@ export interface VerifierVerdict {
   confidence: number;
   evidence: string[];
   reasoning: string;
+}
+
+export type ClaimVerdictType = 'SUPPORTED' | 'REFUTED' | 'NOT_ENOUGH_INFO';
+export type ClaimType = 'numerical' | 'temporal' | 'definitional' | 'general';
+
+export interface ClaimVerdict {
+  id?: string;
+  evaluation_id?: string;
+  claim_text: string;
+  claim_type: ClaimType;
+  verdict: ClaimVerdictType;
+  confidence: number;
+  judge_name: string;
+  text_span_start: number;
+  text_span_end: number;
+  reasoning?: string;
 }
 
 export interface ConfidenceMetrics {

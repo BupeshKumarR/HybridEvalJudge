@@ -200,8 +200,8 @@ def test_export_evaluation_csv(client, auth_headers, created_evaluation):
     assert "attachment" in response.headers.get("content-disposition", "")
 
 
-def test_export_evaluation_pdf_not_implemented(client, auth_headers, created_evaluation):
-    """Test PDF export returns not implemented."""
+def test_export_evaluation_pdf(client, auth_headers, created_evaluation):
+    """Test PDF export returns PDF file."""
     session_id = created_evaluation["id"]
     
     response = client.get(
@@ -209,7 +209,9 @@ def test_export_evaluation_pdf_not_implemented(client, auth_headers, created_eva
         headers=auth_headers
     )
     
-    assert response.status_code == status.HTTP_501_NOT_IMPLEMENTED
+    assert response.status_code == status.HTTP_200_OK
+    assert response.headers["content-type"] == "application/pdf"
+    assert "attachment" in response.headers.get("content-disposition", "")
 
 
 def test_export_evaluation_invalid_format(client, auth_headers, created_evaluation):

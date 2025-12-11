@@ -1,0 +1,43 @@
+version: '3.8'
+
+# Production override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Must be set in production
+    ports: []  # Don't expose to host in production
+
+  redis:
+    restart: always
+    ports: []  # Don't expose to host in production
+
+  backend:
+    build:
+      target: production
+    restart: always
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: warning
+    ports: []  # Only accessible through nginx
+    volumes: []  # No volume mounts in production
+    command: gunicorn app.main:app --workers ${WORKERS:-4} --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --access-logfile - --error-logfile -
+
+  frontend:
+    build:
+      target: production
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL}
+        - REACT_APP_WS_URL=${REACT_APP_WS_URL}
+    restart: always
+    ports: []  # Only accessible through nginx
+    volumes: []  # No volume mounts in production
+    command: nginx -g 'daemon off;'
+
+  nginx:
+    restart: always
+    profiles: []  # Always run in production
+    environment:
+      - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx

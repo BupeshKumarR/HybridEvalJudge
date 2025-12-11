@@ -1,4 +1,12 @@
-import { exportAsJSON, exportAsCSV, exportAsPDF, generateShareableLink, copyToClipboard } from './exportUtils';
+import { 
+  exportAsJSON, 
+  exportAsCSV, 
+  exportAsPDF, 
+  generateShareableLink, 
+  copyToClipboard,
+  exportChatSessionAsJSON,
+  exportChatSessionAsCSV
+} from './exportUtils';
 import apiClient from '../api/client';
 
 jest.mock('../api/client');
@@ -8,7 +16,7 @@ describe('Export Utils', () => {
     jest.clearAllMocks();
     
     // Mock DOM methods
-    document.createElement = jest.fn((tag) => {
+    document.createElement = jest.fn((_tag) => {
       const element = {
         href: '',
         download: '',
@@ -149,6 +157,48 @@ describe('Export Utils', () => {
       expect(consoleErrorSpy).toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('exportChatSessionAsJSON', () => {
+    it('should export chat session as JSON', async () => {
+      const mockData = { session: 'data', messages: [] };
+      (apiClient.get as jest.Mock).mockResolvedValue({
+        data: JSON.stringify(mockData),
+      });
+
+      await exportChatSessionAsJSON('test-chat-session-id');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/chat/sessions/test-chat-session-id/export', {
+        params: { format: 'json' },
+        responseType: 'blob',
+      });
+    });
+
+    it('should handle chat session export errors', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      (apiClient.get as jest.Mock).mockRejectedValue(new Error('Export failed'));
+
+      await expect(exportChatSessionAsJSON('test-chat-session-id')).rejects.toThrow('Export failed');
+      expect(consoleErrorSpy).toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('exportChatSessionAsCSV', () => {
+    it('should export chat session as CSV', async () => {
+      const mockData = 'csv,data';
+      (apiClient.get as jest.Mock).mockResolvedValue({
+        data: mockData,
+      });
+
+      await exportChatSessionAsCSV('test-chat-session-id');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/chat/sessions/test-chat-session-id/export', {
+        params: { format: 'csv' },
+        responseType: 'blob',
+      });
     });
   });
 });

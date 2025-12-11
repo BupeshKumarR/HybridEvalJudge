@@ -10,8 +10,12 @@ import csv
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    pass  # For future type hints if needed
+
+from llm_judge_auditor.components.hallucination_metrics import HallucinationProfile
 from llm_judge_auditor.models import (
     EvaluationResult,
     Issue,
@@ -114,6 +118,122 @@ class ReportGenerator:
             "passages_by_source": passages_by_source,
         }
 
+    def get_hallucination_profile_summary(
+        self, hallucination_profile: Optional[HallucinationProfile]
+    ) -> Dict[str, Any]:
+        """
+        Generate a detailed summary of hallucination profile metrics.
+
+        This method provides a comprehensive view of all hallucination quantification
+        metrics including MiHR, MaHR, FactScore, Consensus F1, Fleiss' Kappa,
+        uncertainty, and reliability classification.
+
+        Args:
+            hallucination_profile: HallucinationProfile object with computed metrics
+
+        Returns:
+            Dictionary with detailed hallucination metrics including:
+            - mihr: Micro Hallucination Rate details
+            - mahr: Macro Hallucination Rate details (if available)
+            - factscore: FactScore value
+            - consensus_f1: Consensus F1 metrics (if available)
+            - fleiss_kappa: Fleiss' Kappa metrics (if available)
+            - uncertainty: Uncertainty quantification (if available)
+            - reliability: Reliability classification
+            - is_high_risk: High risk flag
+            - disputed_claims_count: Number of disputed claims
+            - consensus_claims_count: Number of consensus claims
+
+        Example:
+            >>> generator = ReportGenerator()
+            >>> summary = generator.get_hallucination_profile_summary(profile)
+            >>> print(f"MiHR: {summary['mihr']['value']}")
+
+        Requirements: 8.1, 19.4
+        """
+        if not hallucination_profile:
+            return {
+                "available": False,
+                "mihr": None,
+                "mahr": None,
+                "factscore": None,
+                "consensus_f1": None,
+                "fleiss_kappa": None,
+                "uncertainty": None,
+                "reliability": None,
+                "is_high_risk": None,
+                "disputed_claims_count": 0,
+                "consensus_claims_count": 0,
+            }
+
+        summary = {
+            "available": True,
+            "reliability": hallucination_profile.reliability.value,
+            "is_high_risk": hallucination_profile.is_high_risk,
+            "disputed_claims_count": len(hallucination_profile.disputed_claims),
+            "consensus_claims_count": len(hallucination_profile.consensus_claims),
+        }
+
+        # MiHR details
+        if hallucination_profile.mihr:
+            summary["mihr"] = {
+                "value": hallucination_profile.mihr.value,
+                "unsupported_claims": hallucination_profile.mihr.unsupported_claims,
+                "total_claims": hallucination_profile.mihr.total_claims,
+                "has_claims": hallucination_profile.mihr.has_claims,
+            }
+        else:
+            summary["mihr"] = None
+
+        # MaHR details
+        if hallucination_profile.mahr:
+            summary["mahr"] = {
+                "value": hallucination_profile.mahr.value,
+                "responses_with_hallucinations": hallucination_profile.mahr.responses_with_hallucinations,
+                "total_responses": hallucination_profile.mahr.total_responses,
+            }
+        else:
+            summary["mahr"] = None
+
+        # FactScore
+        summary["factscore"] = hallucination_profile.factscore
+
+        # Consensus F1 details
+        if hallucination_profile.consensus_f1:
+            summary["consensus_f1"] = {
+                "precision": hallucination_profile.consensus_f1.precision,
+                "recall": hallucination_profile.consensus_f1.recall,
+                "f1": hallucination_profile.consensus_f1.f1,
+            }
+        else:
+            summary["consensus_f1"] = None
+
+        # Fleiss' Kappa details
+        if hallucination_profile.fleiss_kappa:
+            summary["fleiss_kappa"] = {
+                "kappa": hallucination_profile.fleiss_kappa.kappa,
+                "interpretation": hallucination_profile.fleiss_kappa.interpretation,
+                "observed_agreement": hallucination_profile.fleiss_kappa.observed_agreement,
+                "expected_agreement": hallucination_profile.fleiss_kappa.expected_agreement,
+                "is_undefined": hallucination_profile.fleiss_kappa.is_undefined,
+            }
+        else:
+            summary["fleiss_kappa"] = None
+
+        # Uncertainty details
+        if hallucination_profile.uncertainty:
+            summary["uncertainty"] = {
+                "shannon_entropy": hallucination_profile.uncertainty.shannon_entropy,
+                "epistemic": hallucination_profile.uncertainty.epistemic,
+                "aleatoric": hallucination_profile.uncertainty.aleatoric,
+                "total": hallucination_profile.uncertainty.total,
+                "is_high_uncertainty": hallucination_profile.uncertainty.is_high_uncertainty,
+            }
+        else:
+            summary["uncertainty"] = None
+
+        return summary
+
     def get_hallucination_summary(self, report: Report) -> Dict[str, Any]:
         """
         Generate a detailed summary of hallucination categorization.
@@ -203,6 +323,49 @@ class ReportGenerator:
         # This method can be used to regenerate or customize the report
         return evaluation.report
 
+    def export_json_with_profile(
+        self,
+        report: Report,
+        hallucination_profile: Optional[HallucinationProfile],
+        path: str,
+        indent: Optional[int] = 2,
+    ) -> None:
+        """
+        Export report to JSON format with hallucination profile metrics.
+
+        This method exports the full report including comprehensive hallucination
+        quantification metrics (MiHR, MaHR, FactScore, Consensus F1, Fleiss' Kappa,
+        uncertainty quantification).
+
+        Args:
+            report: Report object to export
+            hallucination_profile: HallucinationProfile with computed metrics
+            path: File path for the JSON output
+            indent: Number of spaces for indentation (None for compact)
+
+        Example:
+            >>> generator = ReportGenerator()
+            >>> generator.export_json_with_profile(report, profile, "report.json")
+
+        Requirements: 8.1, 19.4
+        """
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Build combined output
+        output_data = report.to_dict()
+        
+        # Add hallucination profile metrics
+        output_data["hallucination_profile"] = (
+            hallucination_profile.to_dict() if hallucination_profile else None
+        )
+        output_data["hallucination_metrics_summary"] = self.get_hallucination_profile_summary(
+            hallucination_profile
+        )
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(output_data, f, indent=indent)
+
     def export_json(self, report: Report, path: str, indent: Optional[int] = 2) -> None:
         """
         Export report to JSON format.
@@ -262,6 +425,194 @@ class ReportGenerator:
             writer.writerow(["Verifier Model", report.metadata.get("verifier_model", "N/A")])
             writer.writerow(["Judge Models", ", ".join(report.metadata.get("judge_models", []))])
             writer.writerow(["Aggregation Strategy", report.metadata.get("aggregation_strategy", "N/A")])
+            writer.writerow([])
+
+            # Write individual scores section
+            writer.writerow(["INDIVIDUAL JUDGE SCORES"])
+            writer.writerow(["Judge Model", "Score"])
+            for model_name, score in report.individual_scores.items():
+                writer.writerow([model_name, f"{score:.2f}"])
+            writer.writerow([])
+
+            # Write verifier verdicts section
+            writer.writerow(["VERIFIER VERDICTS"])
+            writer.writerow(["Verdict #", "Label", "Confidence", "Reasoning", "Evidence"])
+            for idx, verdict in enumerate(report.verifier_verdicts, 1):
+                evidence_str = "; ".join(verdict.evidence) if verdict.evidence else "None"
+                writer.writerow([
+                    idx,
+                    verdict.label.value,
+                    f"{verdict.confidence:.2f}",
+                    verdict.reasoning,
+                    evidence_str
+                ])
+            if not report.verifier_verdicts:
+                writer.writerow(["No verifier verdicts available"])
+            writer.writerow([])
+
+            # Write retrieval provenance section
+            writer.writerow(["RETRIEVAL PROVENANCE"])
+            writer.writerow(["Passage #", "Source", "Relevance Score", "Text"])
+            for idx, passage in enumerate(report.retrieval_provenance, 1):
+                writer.writerow([
+                    idx,
+                    passage.source,
+                    f"{passage.relevance_score:.4f}",
+                    passage.text
+                ])
+            if not report.retrieval_provenance:
+                writer.writerow(["No retrieval performed or no passages retrieved"])
+            writer.writerow([])
+
+            # Write flagged issues section
+            writer.writerow(["FLAGGED ISSUES"])
+            writer.writerow(["Issue #", "Type", "Severity", "Description", "Evidence"])
+            for idx, issue in enumerate(report.flagged_issues, 1):
+                evidence_str = "; ".join(issue.evidence) if issue.evidence else "None"
+                writer.writerow([
+                    idx,
+                    issue.type.value,
+                    issue.severity.value,
+                    issue.description,
+                    evidence_str
+                ])
+            if not report.flagged_issues:
+                writer.writerow(["No issues flagged"])
+            writer.writerow([])
+
+            # Write hallucination categories section
+            writer.writerow(["HALLUCINATION CATEGORIES"])
+            writer.writerow(["Category", "Count"])
+            for category, count in report.hallucination_categories.items():
+                writer.writerow([category.replace("_", " ").title(), count])
+            writer.writerow([])
+
+            # Write reasoning section
+            writer.writerow(["CHAIN-OF-THOUGHT REASONING"])
+            writer.writerow(["Judge Model", "Reasoning"])
+            for model_name, reasoning in report.reasoning.items():
+                writer.writerow([model_name, reasoning])
+            writer.writerow([])
+
+    def export_csv_with_profile(
+        self,
+        report: Report,
+        hallucination_profile: Optional[HallucinationProfile],
+        path: str,
+    ) -> None:
+        """
+        Export report to CSV format with hallucination profile metrics.
+
+        Creates a CSV file with evaluation summary, detailed breakdowns, and
+        comprehensive hallucination quantification metrics.
+
+        Args:
+            report: Report object to export
+            hallucination_profile: HallucinationProfile with computed metrics
+            path: File path for the CSV output
+
+        Example:
+            >>> generator = ReportGenerator()
+            >>> generator.export_csv_with_profile(report, profile, "report.csv")
+
+        Requirements: 8.1, 19.4
+        """
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+
+            # Write summary section
+            writer.writerow(["EVALUATION SUMMARY"])
+            writer.writerow(["Metric", "Value"])
+            writer.writerow(["Timestamp", report.metadata.get("timestamp", "N/A")])
+            writer.writerow(["Task", report.metadata.get("task", "N/A")])
+            writer.writerow(["Criteria", ", ".join(report.metadata.get("criteria", []))])
+            writer.writerow(["Consensus Score", f"{report.consensus_score:.2f}"])
+            writer.writerow(["Confidence", f"{report.confidence:.2f}"])
+            writer.writerow(["Disagreement Level", f"{report.disagreement_level:.2f}"])
+            writer.writerow(["Retrieval Enabled", report.metadata.get("retrieval_enabled", False)])
+            writer.writerow(["Verifier Model", report.metadata.get("verifier_model", "N/A")])
+            writer.writerow(["Judge Models", ", ".join(report.metadata.get("judge_models", []))])
+            writer.writerow(["Aggregation Strategy", report.metadata.get("aggregation_strategy", "N/A")])
+            writer.writerow([])
+
+            # Write hallucination profile metrics section
+            writer.writerow(["HALLUCINATION PROFILE METRICS"])
+            writer.writerow(["Metric", "Value", "Details"])
+            
+            if hallucination_profile:
+                # Reliability and risk
+                writer.writerow(["Reliability", hallucination_profile.reliability.value, ""])
+                writer.writerow(["High Risk", str(hallucination_profile.is_high_risk), ""])
+                
+                # MiHR
+                if hallucination_profile.mihr:
+                    mihr_val = f"{hallucination_profile.mihr.value:.4f}" if hallucination_profile.mihr.value is not None else "N/A"
+                    writer.writerow([
+                        "MiHR (Micro Hallucination Rate)",
+                        mihr_val,
+                        f"{hallucination_profile.mihr.unsupported_claims}/{hallucination_profile.mihr.total_claims} unsupported claims"
+                    ])
+                else:
+                    writer.writerow(["MiHR (Micro Hallucination Rate)", "N/A", ""])
+                
+                # MaHR
+                if hallucination_profile.mahr:
+                    writer.writerow([
+                        "MaHR (Macro Hallucination Rate)",
+                        f"{hallucination_profile.mahr.value:.4f}",
+                        f"{hallucination_profile.mahr.responses_with_hallucinations}/{hallucination_profile.mahr.total_responses} responses with hallucinations"
+                    ])
+                else:
+                    writer.writerow(["MaHR (Macro Hallucination Rate)", "N/A", "Single response evaluation"])
+                
+                # FactScore
+                factscore_val = f"{hallucination_profile.factscore:.4f}" if hallucination_profile.factscore is not None else "N/A"
+                writer.writerow(["FactScore", factscore_val, ""])
+                
+                # Consensus F1
+                if hallucination_profile.consensus_f1:
+                    writer.writerow([
+                        "Consensus F1",
+                        f"{hallucination_profile.consensus_f1.f1:.4f}",
+                        f"Precision: {hallucination_profile.consensus_f1.precision:.4f}, Recall: {hallucination_profile.consensus_f1.recall:.4f}"
+                    ])
+                else:
+                    writer.writerow(["Consensus F1", "N/A", "Requires multiple model responses"])
+                
+                # Fleiss' Kappa
+                if hallucination_profile.fleiss_kappa and not hallucination_profile.fleiss_kappa.is_undefined:
+                    writer.writerow([
+                        "Fleiss' Kappa",
+                        f"{hallucination_profile.fleiss_kappa.kappa:.4f}",
+                        f"Interpretation: {hallucination_profile.fleiss_kappa.interpretation}"
+                    ])
+                else:
+                    writer.writerow(["Fleiss' Kappa", "N/A", "Requires 2+ judges"])
+                
+                # Uncertainty
+                if hallucination_profile.uncertainty:
+                    writer.writerow([
+                        "Total Uncertainty",
+                        f"{hallucination_profile.uncertainty.total:.4f}",
+                        f"Epistemic: {hallucination_profile.uncertainty.epistemic:.4f}, Aleatoric: {hallucination_profile.uncertainty.aleatoric:.4f}"
+                    ])
+                    writer.writerow([
+                        "Shannon Entropy",
+                        f"{hallucination_profile.uncertainty.shannon_entropy:.4f}",
+                        f"High Uncertainty: {hallucination_profile.uncertainty.is_high_uncertainty}"
+                    ])
+                else:
+                    writer.writerow(["Uncertainty", "N/A", "Requires probability outputs"])
+                
+                # Claim analysis
+                writer.writerow(["Disputed Claims Count", str(len(hallucination_profile.disputed_claims)), ""])
+                writer.writerow(["Consensus Claims Count", str(len(hallucination_profile.consensus_claims)), ""])
+            else:
+                writer.writerow(["Hallucination Profile", "Not Available", ""])
+            
             writer.writerow([])
 
             # Write individual scores section
@@ -597,3 +948,198 @@ class ReportGenerator:
         lines.append("=" * 60)
 
         return "\n".join(lines)
+
+    def _generate_text_with_profile(
+        self,
+        report: Report,
+        hallucination_profile: Optional[HallucinationProfile],
+    ) -> str:
+        """
+        Generate plain text content from a report with hallucination profile.
+
+        Args:
+            report: Report object to convert
+            hallucination_profile: HallucinationProfile with computed metrics
+
+        Returns:
+            Plain text formatted string with hallucination metrics
+
+        Requirements: 8.1, 19.4
+        """
+        lines = []
+
+        # Title
+        lines.append("=" * 60)
+        lines.append("LLM EVALUATION REPORT")
+        lines.append("=" * 60)
+        lines.append("")
+
+        # Metadata
+        lines.append("METADATA")
+        lines.append("-" * 60)
+        lines.append(f"Timestamp: {report.metadata.get('timestamp', 'N/A')}")
+        lines.append(f"Task: {report.metadata.get('task', 'N/A')}")
+        lines.append(f"Criteria: {', '.join(report.metadata.get('criteria', []))}")
+        lines.append(f"Retrieval Enabled: {report.metadata.get('retrieval_enabled', False)}")
+        lines.append(f"Verifier Model: {report.metadata.get('verifier_model', 'N/A')}")
+        lines.append(f"Judge Models: {', '.join(report.metadata.get('judge_models', []))}")
+        lines.append(f"Aggregation Strategy: {report.metadata.get('aggregation_strategy', 'N/A')}")
+        lines.append("")
+
+        # Scores
+        lines.append("EVALUATION SCORES")
+        lines.append("-" * 60)
+        lines.append(f"Consensus Score: {report.consensus_score:.2f}/100")
+        lines.append(f"Confidence: {report.confidence:.2f}")
+        lines.append(f"Disagreement Level: {report.disagreement_level:.2f}")
+        lines.append("")
+
+        # Individual scores
+        lines.append("Individual Judge Scores:")
+        for model_name, score in report.individual_scores.items():
+            lines.append(f"  - {model_name}: {score:.2f}/100")
+        lines.append("")
+
+        # Hallucination Profile Metrics
+        lines.append("HALLUCINATION PROFILE METRICS")
+        lines.append("-" * 60)
+        if hallucination_profile:
+            lines.append(f"Reliability: {hallucination_profile.reliability.value}")
+            lines.append(f"High Risk: {hallucination_profile.is_high_risk}")
+            lines.append("")
+            
+            # MiHR
+            if hallucination_profile.mihr:
+                mihr_val = f"{hallucination_profile.mihr.value:.4f}" if hallucination_profile.mihr.value is not None else "N/A"
+                lines.append(f"MiHR (Micro Hallucination Rate): {mihr_val}")
+                lines.append(f"  Unsupported Claims: {hallucination_profile.mihr.unsupported_claims}/{hallucination_profile.mihr.total_claims}")
+            else:
+                lines.append("MiHR: N/A")
+            
+            # MaHR
+            if hallucination_profile.mahr:
+                lines.append(f"MaHR (Macro Hallucination Rate): {hallucination_profile.mahr.value:.4f}")
+                lines.append(f"  Responses with Hallucinations: {hallucination_profile.mahr.responses_with_hallucinations}/{hallucination_profile.mahr.total_responses}")
+            else:
+                lines.append("MaHR: N/A (single response evaluation)")
+            
+            # FactScore
+            factscore_val = f"{hallucination_profile.factscore:.4f}" if hallucination_profile.factscore is not None else "N/A"
+            lines.append(f"FactScore: {factscore_val}")
+            
+            # Consensus F1
+            if hallucination_profile.consensus_f1:
+                lines.append(f"Consensus F1: {hallucination_profile.consensus_f1.f1:.4f}")
+                lines.append(f"  Precision: {hallucination_profile.consensus_f1.precision:.4f}")
+                lines.append(f"  Recall: {hallucination_profile.consensus_f1.recall:.4f}")
+            else:
+                lines.append("Consensus F1: N/A (requires multiple model responses)")
+            
+            # Fleiss' Kappa
+            if hallucination_profile.fleiss_kappa and not hallucination_profile.fleiss_kappa.is_undefined:
+                lines.append(f"Fleiss' Kappa: {hallucination_profile.fleiss_kappa.kappa:.4f}")
+                lines.append(f"  Interpretation: {hallucination_profile.fleiss_kappa.interpretation}")
+                lines.append(f"  Observed Agreement: {hallucination_profile.fleiss_kappa.observed_agreement:.4f}")
+                lines.append(f"  Expected Agreement: {hallucination_profile.fleiss_kappa.expected_agreement:.4f}")
+            else:
+                lines.append("Fleiss' Kappa: N/A (requires 2+ judges)")
+            
+            # Uncertainty
+            if hallucination_profile.uncertainty:
+                lines.append(f"Total Uncertainty: {hallucination_profile.uncertainty.total:.4f}")
+                lines.append(f"  Shannon Entropy: {hallucination_profile.uncertainty.shannon_entropy:.4f}")
+                lines.append(f"  Epistemic: {hallucination_profile.uncertainty.epistemic:.4f}")
+                lines.append(f"  Aleatoric: {hallucination_profile.uncertainty.aleatoric:.4f}")
+                lines.append(f"  High Uncertainty: {hallucination_profile.uncertainty.is_high_uncertainty}")
+            else:
+                lines.append("Uncertainty: N/A (requires probability outputs)")
+            
+            lines.append("")
+            lines.append(f"Disputed Claims: {len(hallucination_profile.disputed_claims)}")
+            lines.append(f"Consensus Claims: {len(hallucination_profile.consensus_claims)}")
+        else:
+            lines.append("Hallucination profile not available")
+        lines.append("")
+
+        # Reasoning
+        lines.append("CHAIN-OF-THOUGHT REASONING")
+        lines.append("-" * 60)
+        for model_name, reasoning in report.reasoning.items():
+            lines.append(f"{model_name}:")
+            lines.append(reasoning)
+            lines.append("")
+
+        # Verifier verdicts
+        lines.append("SPECIALIZED VERIFIER VERDICTS")
+        lines.append("-" * 60)
+        if report.verifier_verdicts:
+            for idx, verdict in enumerate(report.verifier_verdicts, 1):
+                lines.append(f"Verdict {idx}:")
+                lines.append(f"  Label: {verdict.label.value}")
+                lines.append(f"  Confidence: {verdict.confidence:.2f}")
+                if verdict.reasoning:
+                    lines.append(f"  Reasoning: {verdict.reasoning}")
+                lines.append("")
+        else:
+            lines.append("No verifier verdicts available")
+            lines.append("")
+
+        # Flagged issues
+        lines.append("FLAGGED ISSUES")
+        lines.append("-" * 60)
+        if report.flagged_issues:
+            for idx, issue in enumerate(report.flagged_issues, 1):
+                lines.append(f"Issue {idx}:")
+                lines.append(f"  Type: {issue.type.value}")
+                lines.append(f"  Severity: {issue.severity.value}")
+                lines.append(f"  Description: {issue.description}")
+                lines.append("")
+        else:
+            lines.append("No issues flagged")
+            lines.append("")
+
+        # Hallucination categories
+        lines.append("HALLUCINATION CATEGORIES")
+        lines.append("-" * 60)
+        if any(count > 0 for count in report.hallucination_categories.values()):
+            for category, count in report.hallucination_categories.items():
+                if count > 0:
+                    lines.append(f"  {category.replace('_', ' ').title()}: {count}")
+            lines.append("")
+        else:
+            lines.append("No hallucinations detected")
+            lines.append("")
+
+        lines.append("=" * 60)
+        lines.append("END OF REPORT")
+        lines.append("=" * 60)
+
+        return "\n".join(lines)
+
+    def export_text_with_profile(
+        self,
+        report: Report,
+        hallucination_profile: Optional[HallucinationProfile],
+        path: str,
+    ) -> None:
+        """
+        Export report to plain text format with hallucination profile metrics.
+
+        Args:
+            report: Report object to export
+            hallucination_profile: HallucinationProfile with computed metrics
+            path: File path for the text output
+
+        Example:
+            >>> generator = ReportGenerator()
+            >>> generator.export_text_with_profile(report, profile, "report.txt")
+
+        Requirements: 8.1, 19.4
+        """
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        text_content = self._generate_text_with_profile(report, hallucination_profile)
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(text_content)

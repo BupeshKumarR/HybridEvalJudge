@@ -1,13 +1,38 @@
 import React, { useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid } from 'date-fns';
 import { EvaluationResults } from '../../api/types';
 import ExportMenu from '../export/ExportMenu';
 import ShareButton from '../export/ShareButton';
 
 interface EvaluationResultMessageProps {
   results: EvaluationResults;
-  timestamp: Date;
+  timestamp: Date | string;
 }
+
+/**
+ * Safely format a timestamp for display
+ * Handles UTC timestamps from backend properly
+ */
+const formatTimestamp = (timestamp: Date | string): string => {
+  try {
+    let date: Date;
+    if (timestamp instanceof Date) {
+      date = timestamp;
+    } else if (typeof timestamp === 'string') {
+      // Ensure UTC timestamps are parsed correctly
+      const isoString = timestamp.includes('Z') || timestamp.includes('+') || timestamp.includes('-', 10)
+        ? timestamp : timestamp + 'Z';
+      date = new Date(isoString);
+    } else {
+      return 'Just now';
+    }
+    if (!isValid(date) || isNaN(date.getTime())) return 'Just now';
+    if (date > new Date()) return 'Just now'; // Handle future dates
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch {
+    return 'Just now';
+  }
+};
 
 const EvaluationResultMessage: React.FC<EvaluationResultMessageProps> = ({
   results,
@@ -379,7 +404,7 @@ const EvaluationResultMessage: React.FC<EvaluationResultMessageProps> = ({
           </div>
         </div>
         <div className="text-xs text-gray-500 mt-1">
-          {formatDistanceToNow(timestamp, { addSuffix: true })}
+          {formatTimestamp(timestamp)}
         </div>
       </div>
     </div>

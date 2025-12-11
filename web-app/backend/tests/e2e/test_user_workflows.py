@@ -5,14 +5,14 @@ Tests realistic user scenarios from start to finish.
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from tests.conftest import test_db, client
+from tests.conftest import db_session, client
 
 
 class TestCompleteUserWorkflows:
     """Test complete user workflows end-to-end."""
 
     def test_new_user_complete_workflow(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """
         Test complete workflow for a new user:
@@ -110,7 +110,7 @@ class TestCompleteUserWorkflows:
         assert pref_response.status_code == 200
 
     def test_multi_evaluation_workflow(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """
         Test workflow with multiple evaluations:
@@ -194,7 +194,7 @@ class TestCompleteUserWorkflows:
         assert len(page1_data["sessions"]) <= 2
 
     def test_evaluation_export_workflow(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """
         Test evaluation export workflow:
@@ -256,7 +256,7 @@ class TestCompleteUserWorkflows:
         assert "text/csv" in csv_response.headers["content-type"]
 
     def test_preferences_workflow(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """
         Test preferences management workflow:
@@ -337,7 +337,7 @@ class TestCompleteUserWorkflows:
         assert eval_response.status_code == 200
 
     def test_error_recovery_workflow(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """
         Test error handling and recovery:

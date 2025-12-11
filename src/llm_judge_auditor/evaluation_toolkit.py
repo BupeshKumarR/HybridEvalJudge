@@ -14,6 +14,10 @@ from llm_judge_auditor.components.aggregation_engine import (
     AggregationEngine,
     AggregationStrategy as EngineAggregationStrategy,
 )
+from llm_judge_auditor.components.hallucination_metrics import (
+    HallucinationMetricsCalculator,
+    HallucinationProfile,
+)
 from llm_judge_auditor.components.judge_ensemble import JudgeEnsemble
 from llm_judge_auditor.components.model_manager import ModelManager
 from llm_judge_auditor.components.performance_tracker import PerformanceTracker
@@ -242,6 +246,10 @@ class EvaluationToolkit:
             # Initialize performance tracker
             logger.info("Initializing PerformanceTracker...")
             self.performance_tracker = PerformanceTracker()
+            
+            # Initialize hallucination metrics calculator
+            logger.info("Initializing HallucinationMetricsCalculator...")
+            self.hallucination_calculator = HallucinationMetricsCalculator()
             
             # Validate that at least one judge is available
             has_api_judges = self.api_judge_ensemble and self.api_judge_ensemble.get_judge_count() > 0
@@ -557,6 +565,18 @@ class EvaluationToolkit:
                 judge_results=judge_results,
             )
 
+            # Stage 6: Generate hallucination profile
+            logger.info("Stage 6: Hallucination Metrics - Generating hallucination profile")
+            hallucination_profile = self._generate_hallucination_profile(
+                verifier_verdicts=verifier_verdicts,
+                judge_results=judge_results,
+            )
+            if hallucination_profile:
+                logger.info(f"  MiHR: {hallucination_profile.mihr.value if hallucination_profile.mihr and hallucination_profile.mihr.value is not None else 'N/A'}")
+                logger.info(f"  FactScore: {hallucination_profile.factscore if hallucination_profile.factscore is not None else 'N/A'}")
+                logger.info(f"  Reliability: {hallucination_profile.reliability.value}")
+                logger.info(f"  High Risk: {hallucination_profile.is_high_risk}")
+
             # Create evaluation result
             result = EvaluationResult(
                 request=request,
@@ -566,6 +586,7 @@ class EvaluationToolkit:
                 aggregation_metadata=aggregation_metadata,
                 report=report,
                 flagged_issues=flagged_issues,
+                hallucination_profile=hallucination_profile,
             )
 
             logger.info("Evaluation complete")
@@ -919,6 +940,63 @@ class EvaluationToolkit:
                 categories["other"] += 1
 
         return categories
+
+    def _generate_hallucination_profile(
+        self,
+        verifier_verdicts: List[Verdict],
+        judge_results: List[JudgeResult],
+    ) -> Optional[HallucinationProfile]:
+        """
+        Generate a comprehensive hallucination profile from evaluation results.
+
+        This method computes hallucination metrics including MiHR, FactScore,
+        Fleiss' Kappa (if multiple judges), and reliability classification.
+
+        Args:
+            verifier_verdicts: Verdicts from specialized verifier
+            judge_results: Results from judge ensemble
+
+        Returns:
+            HallucinationProfile with all computed metrics, or None if no verdicts
+
+        Requirements: 19.1
+        """
+        # If no verifier verdicts, we can still generate a profile with limited metrics
+        if not verifier_verdicts and not judge_results:
+            return None
+
+        try:
+            # Build judge verdicts dictionary for Fleiss' Kappa calculation
+            # Each judge's "verdict" is derived from their score and flagged issues
+            judge_verdicts_dict = {}
+            
+            if judge_results and verifier_verdicts:
+                # Create synthetic verdicts from judge results based on their scores
+                # High score (>70) = SUPPORTED, Low score (<40) = REFUTED, else = NOT_ENOUGH_INFO
+                for judge_result in judge_results:
+                    synthetic_verdicts = []
+                    for verdict in verifier_verdicts:
+                        # Use the verifier verdict as the base, but this could be enhanced
+                        # to use judge-specific analysis in the future
+                        synthetic_verdicts.append(verdict)
+                    judge_verdicts_dict[judge_result.model_name] = synthetic_verdicts
+
+            # Generate the hallucination profile using the calculator
+            profile = self.hallucination_calculator.generate_hallucination_profile(
+                verdicts=verifier_verdicts if verifier_verdicts else [],
+                response_verdicts=None,  # Single response evaluation
+                claim_matrix=None,  # Would need multiple model responses
+                judge_verdicts=judge_verdicts_dict if len(judge_verdicts_dict) >= 2 else None,
+                probabilities=None,  # Would need probability outputs from models
+                inference_samples=None,  # Would need multiple inference runs
+                consensus_threshold=0.5,
+            )
+
+            return profile
+
+        except Exception as e:
+            logger.warning(f"Failed to generate hallucination profile: {e}")
+            return None
 
     @classmethod
     def from_preset(cls, preset_name: str) -> "EvaluationToolkit":

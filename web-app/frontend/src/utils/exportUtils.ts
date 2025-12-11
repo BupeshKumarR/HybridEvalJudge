@@ -1,9 +1,24 @@
 /**
  * Utility functions for exporting evaluation results in various formats
+ * 
+ * Requirements: 11.1, 11.2, 11.3, 11.4
  */
 
-import { EvaluationSession } from '../api/types';
 import apiClient from '../api/client';
+
+/**
+ * Helper function to trigger file download
+ */
+const downloadBlob = (blob: Blob, filename: string): void => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
 
 /**
  * Export evaluation session as JSON
@@ -15,16 +30,8 @@ export const exportAsJSON = async (sessionId: string): Promise<void> => {
       responseType: 'blob',
     });
 
-    // Create blob and download
     const blob = new Blob([response.data], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `evaluation_${sessionId}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadBlob(blob, `evaluation_${sessionId}.json`);
   } catch (error) {
     console.error('Failed to export as JSON:', error);
     throw error;
@@ -41,16 +48,8 @@ export const exportAsCSV = async (sessionId: string): Promise<void> => {
       responseType: 'blob',
     });
 
-    // Create blob and download
     const blob = new Blob([response.data], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `evaluation_${sessionId}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadBlob(blob, `evaluation_${sessionId}.csv`);
   } catch (error) {
     console.error('Failed to export as CSV:', error);
     throw error;
@@ -67,18 +66,52 @@ export const exportAsPDF = async (sessionId: string): Promise<void> => {
       responseType: 'blob',
     });
 
-    // Create blob and download
     const blob = new Blob([response.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `evaluation_${sessionId}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    downloadBlob(blob, `evaluation_${sessionId}.pdf`);
   } catch (error) {
     console.error('Failed to export as PDF:', error);
+    throw error;
+  }
+};
+
+/**
+ * Export chat session as JSON
+ * Includes all messages and their evaluations
+ * 
+ * Requirements: 11.1, 11.3, 11.4
+ */
+export const exportChatSessionAsJSON = async (sessionId: string): Promise<void> => {
+  try {
+    const response = await apiClient.get(`/chat/sessions/${sessionId}/export`, {
+      params: { format: 'json' },
+      responseType: 'blob',
+    });
+
+    const blob = new Blob([response.data], { type: 'application/json' });
+    downloadBlob(blob, `chat_session_${sessionId}.json`);
+  } catch (error) {
+    console.error('Failed to export chat session as JSON:', error);
+    throw error;
+  }
+};
+
+/**
+ * Export chat session as CSV
+ * Includes all messages and their evaluations in tabular format
+ * 
+ * Requirements: 11.2, 11.3, 11.4
+ */
+export const exportChatSessionAsCSV = async (sessionId: string): Promise<void> => {
+  try {
+    const response = await apiClient.get(`/chat/sessions/${sessionId}/export`, {
+      params: { format: 'csv' },
+      responseType: 'blob',
+    });
+
+    const blob = new Blob([response.data], { type: 'text/csv' });
+    downloadBlob(blob, `chat_session_${sessionId}.csv`);
+  } catch (error) {
+    console.error('Failed to export chat session as CSV:', error);
     throw error;
   }
 };

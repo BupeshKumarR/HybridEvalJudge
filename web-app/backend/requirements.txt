@@ -18,7 +18,8 @@ python-engineio==4.8.0
 
 # Authentication
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+passlib==1.7.4
+bcrypt==4.0.1
 python-multipart==0.0.6
 
 # Validation
@@ -33,6 +34,10 @@ aiohttp==3.9.1
 # Utilities
 python-dotenv==1.0.0
 pyyaml==6.0.1
+
+# Monitoring and observability
+psutil==5.9.6
+sentry-sdk[fastapi]==1.39.1
 
 # Statistics and metrics
 numpy==1.26.2
@@ -52,3 +57,7 @@ httpx==0.25.2
 black==23.11.0
 flake8==6.1.0
 mypy==1.7.1
+
+# API Judge clients
+groq>=0.4.0
+google-generativeai>=0.3.0

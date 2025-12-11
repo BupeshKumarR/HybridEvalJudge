@@ -35,7 +35,7 @@ def test_get_preferences_creates_defaults(
     assert data["notifications_enabled"] is True
     
     # Verify preferences were created in database
-    prefs = db.query(UserPreference).filter(
+    prefs = db_session.query(UserPreference).filter(
         UserPreference.user_id == created_user.id
     ).first()
     assert prefs is not None
@@ -57,8 +57,8 @@ def test_get_existing_preferences(
         theme="dark",
         notifications_enabled=False,
     )
-    db.add(prefs)
-    db.commit()
+    db_session.add(prefs)
+    db_session.commit()
     
     # Get preferences
     response = client.get("/api/v1/preferences", headers=auth_headers)
@@ -87,8 +87,8 @@ def test_update_preferences(
         default_retrieval_enabled=True,
         default_aggregation_strategy="weighted_average",
     )
-    db.add(prefs)
-    db.commit()
+    db_session.add(prefs)
+    db_session.commit()
     
     # Update preferences
     update_data = {
@@ -111,7 +111,7 @@ def test_update_preferences(
     assert data["default_aggregation_strategy"] == "majority_vote"
     
     # Verify in database
-    db.refresh(prefs)
+    db_session.refresh(prefs)
     assert prefs.default_judge_models == ["claude-3", "gemini-pro"]
     assert prefs.default_retrieval_enabled is False
     assert prefs.default_aggregation_strategy == "majority_vote"
@@ -125,10 +125,10 @@ def test_update_preferences_creates_if_not_exist(
 ):
     """Test that updating preferences creates them if they don't exist."""
     # Ensure no preferences exist
-    db.query(UserPreference).filter(
+    db_session.query(UserPreference).filter(
         UserPreference.user_id == created_user.id
     ).delete()
-    db.commit()
+    db_session.commit()
     
     # Update preferences
     update_data = {
@@ -149,7 +149,7 @@ def test_update_preferences_creates_if_not_exist(
     assert data["default_retrieval_enabled"] is False
     
     # Verify preferences were created
-    prefs = db.query(UserPreference).filter(
+    prefs = db_session.query(UserPreference).filter(
         UserPreference.user_id == created_user.id
     ).first()
     assert prefs is not None
@@ -170,8 +170,8 @@ def test_update_partial_preferences(
         default_aggregation_strategy="weighted_average",
         theme="light",
     )
-    db.add(prefs)
-    db.commit()
+    db_session.add(prefs)
+    db_session.commit()
     
     # Update only judge models
     update_data = {
@@ -212,8 +212,8 @@ def test_reset_preferences(
         theme="dark",
         notifications_enabled=False,
     )
-    db.add(prefs)
-    db.commit()
+    db_session.add(prefs)
+    db_session.commit()
     
     # Reset preferences
     response = client.post("/api/v1/preferences/reset", headers=auth_headers)
@@ -229,7 +229,7 @@ def test_reset_preferences(
     assert data["notifications_enabled"] is True
     
     # Verify in database
-    db.refresh(prefs)
+    db_session.refresh(prefs)
     assert prefs.default_judge_models == ["gpt-4", "claude-3"]
 
 
@@ -245,8 +245,8 @@ def test_delete_preferences(
         user_id=created_user.id,
         default_judge_models=["gpt-4"],
     )
-    db.add(prefs)
-    db.commit()
+    db_session.add(prefs)
+    db_session.commit()
     
     # Delete preferences
     response = client.delete("/api/v1/preferences", headers=auth_headers)
@@ -255,7 +255,7 @@ def test_delete_preferences(
     assert response.json()["message"] == "Preferences deleted successfully"
     
     # Verify deletion
-    prefs = db.query(UserPreference).filter(
+    prefs = db_session.query(UserPreference).filter(
         UserPreference.user_id == created_user.id
     ).first()
     assert prefs is None
@@ -295,16 +295,16 @@ def test_preferences_isolated_by_user(
         email="other@example.com",
         password_hash=get_password_hash("password123")
     )
-    db.add(other_user)
-    db.commit()
+    db_session.add(other_user)
+    db_session.commit()
     
     # Create preferences for other user
     other_prefs = UserPreference(
         user_id=other_user.id,
         default_judge_models=["other-model"],
     )
-    db.add(other_prefs)
-    db.commit()
+    db_session.add(other_prefs)
+    db_session.commit()
     
     # Get preferences as test_user
     response = client.get("/api/v1/preferences", headers=auth_headers)

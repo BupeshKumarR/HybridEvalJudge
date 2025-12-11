@@ -57,6 +57,9 @@ Welcome to the LLM Judge Auditor documentation. This index helps you find the ri
 - [Error Handling](ERROR_HANDLING.md) - Error handling and recovery
 - [Claim Router](CLAIM_ROUTER.md) - Intelligent claim routing
 
+### Hallucination Quantification
+- [Hallucination Metrics](HALLUCINATION_METRICS.md) - MiHR, MaHR, FactScore, Fleiss' Kappa, uncertainty quantification
+
 ### Specialized Components
 - [Adversarial Tester](ADVERSARIAL_TESTING.md) - Adversarial testing
 - [Reliability Validator](RELIABILITY_VALIDATION.md) - Reliability validation
@@ -131,6 +134,13 @@ Welcome to the LLM Judge Auditor documentation. This index helps you find the ri
 - [Report Generator](../examples/report_generator_example.py)
 - [Claim Router](../examples/claim_router_example.py)
 - [Plugin System](../examples/plugin_system_example.py)
+
+### Hallucination Quantification Examples
+- [Hallucination Metrics](../examples/hallucination_metrics_example.py) - MiHR, MaHR, FactScore
+- [Consensus Analysis](../examples/consensus_analysis_example.py) - Cross-model agreement
+- [Uncertainty Quantification](../examples/uncertainty_quantification_example.py) - Shannon entropy
+- [Hallucination Profile](../examples/hallucination_profile_example.py) - Complete profiles
+- [False Acceptance Rate](../examples/false_acceptance_rate_example.py) - Abstention testing
 
 ### API Examples
 - [Groq Judge](../examples/groq_judge_example.py) - Groq API usage

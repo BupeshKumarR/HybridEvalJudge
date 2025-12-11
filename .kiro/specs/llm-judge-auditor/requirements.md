@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Hybrid LLM Evaluation Toolkit is an open-source system that combines multiple evaluation approaches to assess LLM outputs for factual accuracy, hallucinations, and bias. The system integrates: (1) specialized fact-checking models (e.g., MiniCheck, HHEM) for high-accuracy statement-level verification, (2) an ensemble of local judge LLMs (e.g., LLaMA 3, Mistral 7B) for broad coverage evaluation, and (3) retrieval-augmented verification with external knowledge sources. This hybrid architecture leverages the precision of fine-tuned verifiers and the flexibility of LLM judges to provide comprehensive, research-grounded evaluation. The toolkit is model-agnostic, domain-general, and runs entirely locally without requiring paid APIs or cloud compute.
+The Hybrid LLM Evaluation Toolkit is an open-source system that combines multiple evaluation approaches to assess LLM outputs for factual accuracy, hallucinations, and bias. The system integrates: (1) specialized fact-checking models (e.g., MiniCheck, HHEM) for high-accuracy statement-level verification, (2) an ensemble of local judge LLMs (e.g., LLaMA 3, Mistral 7B) for broad coverage evaluation, (3) retrieval-augmented verification with external knowledge sources, and (4) research-backed hallucination quantification metrics (MiHR, MaHR, FactScore, Consensus F1, Fleiss' Kappa, uncertainty quantification). This hybrid architecture leverages the precision of fine-tuned verifiers, the flexibility of LLM judges, and rigorous statistical metrics to provide comprehensive, quantified hallucination detection. The toolkit is model-agnostic, domain-general, and runs entirely locally without requiring paid APIs or cloud compute.
 
 ## Glossary
 
@@ -20,6 +20,18 @@ The Hybrid LLM Evaluation Toolkit is an open-source system that combines multipl
 - **Knowledge Base**: External factual sources (e.g., Wikipedia dumps, FEVER dataset) used for fact-checking
 - **Ensemble Aggregation**: The process of combining scores from multiple judge models into a final consensus evaluation
 - **Multi-Stage Pipeline**: An evaluation workflow that applies specialized verifiers first, then broader LLM judges for comprehensive assessment
+- **Micro Hallucination Rate (MiHR)**: Fraction of claims in a response that are unsupported (unsupported_claims / total_claims)
+- **Macro Hallucination Rate (MaHR)**: Fraction of responses containing any hallucination (responses_with_hallucinations / total_responses)
+- **FactScore**: Factual precision metric (verified_claims / total_claims)
+- **Consensus F1**: F1 score combining precision (claims supported by other models) and recall (inclusion of consensus claims)
+- **Fleiss' Kappa (κ)**: Inter-rater agreement statistic: κ = (Po - Pe) / (1 - Pe)
+- **Shannon Entropy**: Uncertainty measure: H(p) = -Σ pᵢ log pᵢ
+- **Epistemic Uncertainty**: Model uncertainty from lack of knowledge (variance across inference samples)
+- **Aleatoric Uncertainty**: Inherent data noise (expected variance within samples)
+- **Atomic Claim**: Single verifiable factual statement extracted from a response
+- **Claim Verification Matrix**: Structure tracking which claims are supported by which models/judges
+- **False Acceptance Rate**: Fraction of non-existent entity queries where model fails to abstain
+- **Hallucination Profile**: Comprehensive report with all quantified metrics
 
 ## Requirements
 
@@ -193,3 +205,73 @@ The Hybrid LLM Evaluation Toolkit is an open-source system that combines multipl
 4. WHEN testing with contradictory claims, THE Evaluation Toolkit SHALL identify the contradiction and flag both statements
 5. WHEN adversarial testing completes, THE Evaluation Toolkit SHALL generate a robustness report showing detection rates for different perturbation types
 6. WHEN testing with biased input variations (e.g., demographic attribute changes), THE Evaluation Toolkit SHALL measure and report scoring consistency across variations
+
+### Requirement 15
+
+**User Story:** As a researcher, I want to compute Micro and Macro Hallucination Rates, so that I can quantify hallucination at claim-level and response-level granularity.
+
+#### Acceptance Criteria
+
+1. WHEN a response with extracted claims is evaluated, THE Evaluation Toolkit SHALL compute MiHR as unsupported_claims / total_claims
+2. WHEN multiple responses are evaluated, THE Evaluation Toolkit SHALL compute MaHR as responses_with_hallucinations / total_responses
+3. WHEN computing MiHR, THE Evaluation Toolkit SHALL classify each claim as supported, refuted, or unverifiable
+4. WHEN MiHR or MaHR is computed, THE Evaluation Toolkit SHALL return values in range [0.0, 1.0]
+5. WHEN a response contains zero extractable claims, THE Evaluation Toolkit SHALL return MiHR as None with a flag
+
+### Requirement 16
+
+**User Story:** As a data scientist, I want to compute FactScore and Consensus F1, so that I can measure factual precision and cross-model agreement.
+
+#### Acceptance Criteria
+
+1. WHEN a response is evaluated, THE Evaluation Toolkit SHALL extract atomic claims and compute FactScore as verified_claims / total_claims
+2. WHEN multiple models respond to the same query, THE Evaluation Toolkit SHALL build a claim verification matrix
+3. WHEN computing Consensus F1, THE Evaluation Toolkit SHALL calculate precision (model claims supported by others) and recall (consensus claims included)
+4. WHEN precision and recall are computed, THE Evaluation Toolkit SHALL compute F1 = 2 × (precision × recall) / (precision + recall)
+5. WHEN both precision and recall are zero, THE Evaluation Toolkit SHALL return F1 as 0.0
+
+### Requirement 17
+
+**User Story:** As a quality engineer, I want to measure inter-judge agreement using Fleiss' Kappa, so that I can assess evaluation reliability.
+
+#### Acceptance Criteria
+
+1. WHEN multiple judges evaluate the same claims, THE Evaluation Toolkit SHALL compute Fleiss' Kappa using κ = (Po - Pe) / (1 - Pe)
+2. WHEN computing Kappa, THE Evaluation Toolkit SHALL calculate observed agreement (Po) and expected agreement (Pe)
+3. WHEN Kappa is computed, THE Evaluation Toolkit SHALL provide interpretation (poor <0.2, fair 0.2-0.4, moderate 0.4-0.6, substantial 0.6-0.8, almost perfect >0.8)
+4. WHEN fewer than two judges provide ratings, THE Evaluation Toolkit SHALL return Kappa as undefined with error
+
+### Requirement 18
+
+**User Story:** As a ML engineer, I want to quantify model uncertainty using Shannon entropy with epistemic/aleatoric decomposition, so that I can identify when models may hallucinate.
+
+#### Acceptance Criteria
+
+1. WHEN a model generates a response with probabilities, THE Evaluation Toolkit SHALL compute Shannon entropy H(p) = -Σ pᵢ log pᵢ
+2. WHEN multiple inference samples are generated, THE Evaluation Toolkit SHALL compute epistemic uncertainty as variance across samples
+3. WHEN multiple inference samples are generated, THE Evaluation Toolkit SHALL compute aleatoric uncertainty as expected variance within samples
+4. WHEN uncertainty exceeds a threshold, THE Evaluation Toolkit SHALL flag the response as high-uncertainty
+5. WHEN computing total uncertainty, THE Evaluation Toolkit SHALL return epistemic + aleatoric components
+
+### Requirement 19
+
+**User Story:** As a researcher, I want to generate hallucination profiles with all metrics, so that I can analyze model performance comprehensively.
+
+#### Acceptance Criteria
+
+1. WHEN evaluation completes, THE Evaluation Toolkit SHALL compile MiHR, MaHR, FactScore, F1, Kappa, and uncertainty into a hallucination profile
+2. WHEN generating a profile, THE Evaluation Toolkit SHALL assign reliability classification (high, medium, low) based on thresholds
+3. WHEN generating a profile, THE Evaluation Toolkit SHALL include claim-level analysis with disputed and consensus claims
+4. WHEN generating a profile, THE Evaluation Toolkit SHALL serialize to JSON format
+5. WHEN MiHR > 0.3 or Kappa < 0.4 or uncertainty > 0.8, THE Evaluation Toolkit SHALL flag as high risk
+
+### Requirement 20
+
+**User Story:** As a researcher, I want to measure False Acceptance Rate for abstention testing, so that I can evaluate model refusal behavior.
+
+#### Acceptance Criteria
+
+1. WHEN queries about non-existent entities are submitted, THE Evaluation Toolkit SHALL track abstention vs response
+2. WHEN computing False Acceptance Rate, THE Evaluation Toolkit SHALL calculate failed_abstentions / total_nonexistent_queries
+3. WHEN a model abstains appropriately, THE Evaluation Toolkit SHALL classify as correct refusal
+4. WHEN a model generates content for non-existent entity, THE Evaluation Toolkit SHALL classify as false acceptance

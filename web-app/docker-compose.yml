@@ -1,33 +1,41 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: llm-judge-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: llm_judge_auditor
-      POSTGRES_USER: llm_judge_user
+      POSTGRES_DB: ${POSTGRES_DB:-llm_judge_auditor}
+      POSTGRES_USER: ${POSTGRES_USER:-llm_judge_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U llm_judge_user"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-llm_judge_user} -d ${POSTGRES_DB:-llm_judge_auditor}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - llm-judge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # Redis Cache (optional)
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: llm-judge-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -35,67 +43,113 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
     networks:
       - llm-judge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Backend API (FastAPI)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: development
+      target: ${BUILD_TARGET:-development}
+      args:
+        - PYTHON_VERSION=3.11
     container_name: llm-judge-backend
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://llm_judge_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/llm_judge_auditor
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-llm_judge_user}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-llm_judge_auditor}
+      # Redis
       REDIS_URL: redis://redis:6379/0
+      # Security
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      # Application
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:80}
+      # Workers
+      WORKERS: ${WORKERS:-4}
+      # API Judge Keys (for real API judges)
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Ollama configuration (use host.docker.internal for macOS/Windows to reach host)
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - ./backend:/app
-      - /app/__pycache__
+      - ./backend:/app:${VOLUME_MODE:-rw}
+      - backend_cache:/app/__pycache__
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: ${BACKEND_COMMAND:-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload}
     networks:
       - llm-judge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Frontend (React)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: development
+      target: ${BUILD_TARGET:-development}
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+        - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
     container_name: llm-judge-frontend
+    restart: unless-stopped
     environment:
       REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000}
       REACT_APP_WS_URL: ${REACT_APP_WS_URL:-ws://localhost:8000}
+      NODE_ENV: ${NODE_ENV:-development}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_INTERNAL_PORT:-3000}"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend:/app:${VOLUME_MODE:-rw}
+      - frontend_modules:/app/node_modules
     depends_on:
       - backend
-    command: npm start
+    command: ${FRONTEND_COMMAND:-npm start}
     networks:
       - llm-judge-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # Nginx Reverse Proxy (Production)
+  # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
     container_name: llm-judge-nginx
+    restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_cache:/var/cache/nginx
+      - nginx_logs:/var/log/nginx
     depends_on:
       - frontend
       - backend
@@ -103,11 +157,35 @@ services:
       - llm-judge-network
     profiles:
       - production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+  backend_cache:
+    driver: local
+  frontend_modules:
+    driver: local
+  nginx_cache:
+    driver: local
+  nginx_logs:
+    driver: local
 
 networks:
   llm-judge-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

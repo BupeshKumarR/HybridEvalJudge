@@ -129,9 +129,9 @@ const SharedEvaluationView: React.FC = () => {
         20,
     },
     inter_judge_agreement: {
-      cohens_kappa: null,
-      fleiss_kappa: null,
-      krippendorff_alpha: null,
+      cohens_kappa: undefined,
+      fleiss_kappa: undefined,
+      krippendorff_alpha: undefined,
       pairwise_correlations: {},
       interpretation: 'N/A',
     },

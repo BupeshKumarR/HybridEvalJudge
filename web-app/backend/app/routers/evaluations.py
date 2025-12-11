@@ -1,7 +1,7 @@
 """
 Evaluation router for creating and managing evaluation sessions.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import desc, func
@@ -31,6 +31,8 @@ from ..schemas import (
 )
 from ..auth import get_current_active_user
 from ..cache import get_cached, set_cached, invalidate_cache
+from ..security import check_rate_limit, input_sanitizer
+from ..audit_log import audit_logger, AuditEventType
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ router = APIRouter(prefix="/api/v1/evaluations", tags=["evaluations"])
 
 @router.post("", response_model=EvaluationSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_evaluation(
+    request: Request,
     evaluation_data: EvaluationSessionCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -47,6 +50,7 @@ async def create_evaluation(
     Create a new evaluation session.
     
     Args:
+        request: FastAPI request object
         evaluation_data: Evaluation request data
         current_user: Current authenticated user
         db: Database session
@@ -54,11 +58,18 @@ async def create_evaluation(
     Returns:
         Created evaluation session with session_id and websocket_url
     """
+    # Get client IP for audit logging
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    
+    # Sanitize text inputs
+    source_text = input_sanitizer.sanitize_text(evaluation_data.source_text, max_length=50000)
+    candidate_output = input_sanitizer.sanitize_text(evaluation_data.candidate_output, max_length=50000)
+    
     # Create new evaluation session
     new_session = EvaluationSession(
         user_id=current_user.id,
-        source_text=evaluation_data.source_text,
-        candidate_output=evaluation_data.candidate_output,
+        source_text=source_text,
+        candidate_output=candidate_output,
         status=EvaluationStatus.PENDING,
         config=evaluation_data.config.model_dump() if evaluation_data.config else None
     )
@@ -69,6 +80,19 @@ async def create_evaluation(
     
     logger.info(
         f"Evaluation session created: {new_session.id} by user {current_user.username}"
+    )
+    
+    # Log evaluation creation
+    audit_logger.log_evaluation_event(
+        event_type=AuditEventType.EVALUATION_CREATE,
+        user_id=str(current_user.id),
+        username=current_user.username,
+        session_id=str(new_session.id),
+        ip_address=client_ip,
+        details={
+            "source_length": len(source_text),
+            "candidate_length": len(candidate_output)
+        }
     )
     
     # Return session with websocket URL for streaming updates

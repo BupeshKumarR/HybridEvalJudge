@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-12-10T09:59:44.522706",
+  "question": "when does it snow in boston, ma",
+  "response": "In Boston, Massachusetts, it typically snows from December to March, with the majority of snowfall occurring between January and February. Here's a breakdown of the average snowfall and snowfall frequency in Boston:\n\n* **December**: Average snowfall: 12.1 inches (30.7 cm), with an average of 4-5 snowfall events per month.\n* **January**: Average snowfall: 13.2 inches (33.5 cm), with an average of 5-6 snowfall events per month. This is usually the snowiest month in Boston.\n* **February**: Average snowfall: 10.5 inches (26.7 cm), with an average of 4-5 snowfall events per month.\n* **March**: Average snowfall: 6.7 inches (17 cm), with an average of 2-3 snowfall events per month.\n\nIt's not uncommon for Boston to experience occasional snowfall in November or April, but these events are typically light and don't accumulate much.\n\nSome notable snowfall events in Boston include:\n\n* The **Great Blizzard of 1978**, which dumped 27.1 inches (68.8 cm) of snow on February 6-7, 1978.\n* The **Blizzard of 1993**, which brought 17.8 inches (45.2 cm) of snow on March 12-14, 1993.\n* The **Winter of 2014-2015**, which saw a record 108.6 inches (275.8 cm) of snowfall, with 64.8 inches (164.6 cm) falling in February 2015 alone.\n\nKeep in mind that snowfall can vary greatly from year to year, even in the same region. If you're planning a trip to Boston or live in the area, it's always a good idea to check the local weather forecast for the most up-to-date information.",
+  "consensus_score": 85.0,
+  "individual_scores": {
+    "gemini-gemini-2.0-flash-exp": 85.0
+  },
+  "disagreement": 0.0,
+  "hallucination_metrics": {
+    "claims_extracted": 10,
+    "mihr": 0.0,
+    "factscore": 1.0,
+    "kappa": null,
+    "kappa_interpretation": null
+  },
+  "is_high_risk": false,
+  "risk_reasons": []
+}

@@ -22,7 +22,10 @@ def test_register_duplicate_username(client, test_user_data, created_user):
     response = client.post("/api/v1/auth/register", json=test_user_data)
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "already registered" in response.json()["detail"].lower()
+    data = response.json()
+    # Check for error message in either 'detail' or 'error' field
+    error_msg = data.get("detail", data.get("error", "")).lower()
+    assert "already registered" in error_msg
 
 
 def test_register_duplicate_email(client, test_user_data, created_user):
@@ -33,7 +36,10 @@ def test_register_duplicate_email(client, test_user_data, created_user):
     response = client.post("/api/v1/auth/register", json=new_user_data)
     
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "already registered" in response.json()["detail"].lower()
+    data = response.json()
+    # Check for error message in either 'detail' or 'error' field
+    error_msg = data.get("detail", data.get("error", "")).lower()
+    assert "already registered" in error_msg
 
 
 def test_register_invalid_email(client, test_user_data):

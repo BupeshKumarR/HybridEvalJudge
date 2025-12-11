@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from 'react-query';
 import AppRoutes from './routes';
 import { usePreferences } from './hooks/usePreferences';
+import ToastContainer from './components/common/ToastContainer';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -17,7 +18,12 @@ function AppContent() {
   // Load user preferences on authentication
   usePreferences();
 
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      <ToastContainer />
+    </>
+  );
 }
 
 function App() {

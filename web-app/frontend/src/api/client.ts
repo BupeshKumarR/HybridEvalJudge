@@ -2,7 +2,9 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 import { useAuthStore } from '../store/authStore';
 
 // API base URL - can be configured via environment variable
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Support both REACT_APP_API_BASE_URL and REACT_APP_API_URL for flexibility
+const baseUrl = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({

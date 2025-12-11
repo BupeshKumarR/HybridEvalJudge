@@ -52,25 +52,21 @@ class TestUserModel:
     
     def test_username_validation(self, db_session):
         """Test username length validation."""
-        user = User(
-            username="ab",  # Too short
-            email="test@example.com",
-            password_hash="hashed_password"
-        )
         with pytest.raises(ValueError, match="at least 3 characters"):
-            db_session.add(user)
-            db_session.flush()
+            user = User(
+                username="ab",  # Too short
+                email="test@example.com",
+                password_hash="hashed_password"
+            )
     
     def test_email_validation(self, db_session):
         """Test email format validation."""
-        user = User(
-            username="testuser",
-            email="invalid-email",
-            password_hash="hashed_password"
-        )
         with pytest.raises(ValueError, match="Invalid email format"):
-            db_session.add(user)
-            db_session.flush()
+            user = User(
+                username="testuser",
+                email="invalid-email",
+                password_hash="hashed_password"
+            )
 
 
 class TestEvaluationSessionModel:
@@ -110,15 +106,13 @@ class TestEvaluationSessionModel:
         db_session.add(user)
         db_session.commit()
         
-        session = EvaluationSession(
-            user_id=user.id,
-            source_text="Source text",
-            candidate_output="Candidate output",
-            status="invalid_status"
-        )
         with pytest.raises(ValueError, match="Status must be one of"):
-            db_session.add(session)
-            db_session.flush()
+            session = EvaluationSession(
+                user_id=user.id,
+                source_text="Source text",
+                candidate_output="Candidate output",
+                status="invalid_status"
+            )
     
     def test_score_validation(self, db_session):
         """Test score range validation."""
@@ -130,15 +124,13 @@ class TestEvaluationSessionModel:
         db_session.add(user)
         db_session.commit()
         
-        session = EvaluationSession(
-            user_id=user.id,
-            source_text="Source text",
-            candidate_output="Candidate output",
-            consensus_score=150  # Invalid: > 100
-        )
         with pytest.raises(ValueError, match="must be between 0 and 100"):
-            db_session.add(session)
-            db_session.flush()
+            session = EvaluationSession(
+                user_id=user.id,
+                source_text="Source text",
+                candidate_output="Candidate output",
+                consensus_score=150  # Invalid: > 100
+            )
 
 
 class TestJudgeResultModel:
@@ -195,15 +187,13 @@ class TestJudgeResultModel:
         db_session.add(session)
         db_session.commit()
         
-        judge_result = JudgeResult(
-            session_id=session.id,
-            judge_name="test_judge",
-            score=150,  # Invalid
-            confidence=0.9
-        )
         with pytest.raises(ValueError, match="Score must be between 0 and 100"):
-            db_session.add(judge_result)
-            db_session.flush()
+            judge_result = JudgeResult(
+                session_id=session.id,
+                judge_name="test_judge",
+                score=150,  # Invalid
+                confidence=0.9
+            )
     
     def test_confidence_validation(self, db_session):
         """Test confidence validation."""
@@ -223,15 +213,13 @@ class TestJudgeResultModel:
         db_session.add(session)
         db_session.commit()
         
-        judge_result = JudgeResult(
-            session_id=session.id,
-            judge_name="test_judge",
-            score=85,
-            confidence=1.5  # Invalid
-        )
         with pytest.raises(ValueError, match="Confidence must be between 0 and 1"):
-            db_session.add(judge_result)
-            db_session.flush()
+            judge_result = JudgeResult(
+                session_id=session.id,
+                judge_name="test_judge",
+                score=85,
+                confidence=1.5  # Invalid
+            )
 
 
 class TestFlaggedIssueModel:
@@ -304,15 +292,13 @@ class TestFlaggedIssueModel:
         db_session.add(judge_result)
         db_session.commit()
         
-        issue = FlaggedIssue(
-            judge_result_id=judge_result.id,
-            issue_type="invalid_type",
-            severity="high",
-            description="Test issue"
-        )
         with pytest.raises(ValueError, match="Issue type must be one of"):
-            db_session.add(issue)
-            db_session.flush()
+            issue = FlaggedIssue(
+                judge_result_id=judge_result.id,
+                issue_type="invalid_type",
+                severity="high",
+                description="Test issue"
+            )
 
 
 class TestCascadeDeletes:

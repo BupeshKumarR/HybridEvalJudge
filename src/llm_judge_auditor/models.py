@@ -8,7 +8,10 @@ including claims, passages, verdicts, and evaluation results.
 import json
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from llm_judge_auditor.components.hallucination_metrics import HallucinationProfile
 
 
 class VerdictLabel(str, Enum):
@@ -240,6 +243,8 @@ class EvaluationResult:
         judge_results: Individual judge results
         aggregation_metadata: Metadata about aggregation
         report: Full evaluation report
+        flagged_issues: List of detected issues
+        hallucination_profile: Comprehensive hallucination metrics profile (optional)
     """
 
     request: EvaluationRequest
@@ -249,6 +254,7 @@ class EvaluationResult:
     aggregation_metadata: AggregationMetadata
     report: Report
     flagged_issues: List[Issue] = field(default_factory=list)
+    hallucination_profile: Optional[Any] = None  # HallucinationProfile, using Any to avoid circular import
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -356,6 +362,12 @@ class EvaluationResult:
             for i in data.get("flagged_issues", [])
         ]
 
+        # Handle hallucination_profile if present
+        hallucination_profile = None
+        if data.get("hallucination_profile"):
+            from llm_judge_auditor.components.hallucination_metrics import HallucinationProfile
+            hallucination_profile = HallucinationProfile.from_dict(data["hallucination_profile"])
+
         return cls(
             request=request,
             consensus_score=data["consensus_score"],
@@ -364,6 +376,7 @@ class EvaluationResult:
             aggregation_metadata=aggregation_metadata,
             report=report,
             flagged_issues=flagged_issues,
+            hallucination_profile=hallucination_profile,
         )
 
     @classmethod

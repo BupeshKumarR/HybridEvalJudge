@@ -1,7 +1,7 @@
 """
 Authentication router for user registration, login, and logout.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -22,6 +22,8 @@ from ..auth import (
     get_current_active_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from ..security import input_sanitizer
+from ..audit_log import audit_logger, AuditEventType
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(
+    request: Request,
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
@@ -37,6 +40,7 @@ async def register_user(
     Register a new user account.
     
     Args:
+        request: FastAPI request object
         user_data: User registration data (username, email, password)
         db: Database session
         
@@ -46,17 +50,43 @@ async def register_user(
     Raises:
         HTTPException: If username or email already exists
     """
+    # Get client IP for audit logging
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    user_agent = request.headers.get("User-Agent", "")
+    
+    # Sanitize inputs
+    username = input_sanitizer.sanitize_text(user_data.username, max_length=255)
+    email = input_sanitizer.sanitize_text(user_data.email, max_length=255)
+    
     # Check if username already exists
-    existing_user = db.query(User).filter(User.username == user_data.username).first()
+    existing_user = db.query(User).filter(User.username == username).first()
     if existing_user:
+        # Log failed registration attempt
+        audit_logger.log_authentication_event(
+            event_type=AuditEventType.REGISTRATION,
+            username=username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            success=False,
+            details={"reason": "username_exists"}
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered"
         )
     
     # Check if email already exists
-    existing_email = db.query(User).filter(User.email == user_data.email).first()
+    existing_email = db.query(User).filter(User.email == email).first()
     if existing_email:
+        # Log failed registration attempt
+        audit_logger.log_authentication_event(
+            event_type=AuditEventType.REGISTRATION,
+            username=username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            success=False,
+            details={"reason": "email_exists"}
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
@@ -65,8 +95,8 @@ async def register_user(
     # Create new user
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
-        username=user_data.username,
-        email=user_data.email,
+        username=username,
+        email=email,
         password_hash=hashed_password
     )
     
@@ -89,11 +119,22 @@ async def register_user(
     
     logger.info(f"New user registered: {new_user.username} (ID: {new_user.id})")
     
+    # Log successful registration
+    audit_logger.log_authentication_event(
+        event_type=AuditEventType.REGISTRATION,
+        username=username,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        success=True,
+        details={"user_id": str(new_user.id)}
+    )
+    
     return new_user
 
 
 @router.post("/login", response_model=Token)
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -101,6 +142,7 @@ async def login(
     Login with username and password to get access token.
     
     Args:
+        request: FastAPI request object
         form_data: OAuth2 form data with username and password
         db: Database session
         
@@ -110,8 +152,21 @@ async def login(
     Raises:
         HTTPException: If authentication fails
     """
+    # Get client IP for audit logging
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    user_agent = request.headers.get("User-Agent", "")
+    
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        # Log failed login attempt
+        audit_logger.log_authentication_event(
+            event_type=AuditEventType.LOGIN_FAILURE,
+            username=form_data.username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            success=False,
+            details={"reason": "invalid_credentials"}
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -131,11 +186,22 @@ async def login(
     
     logger.info(f"User logged in: {user.username} (ID: {user.id})")
     
+    # Log successful login
+    audit_logger.log_authentication_event(
+        event_type=AuditEventType.LOGIN_SUCCESS,
+        username=user.username,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        success=True,
+        details={"user_id": str(user.id)}
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/login/json", response_model=Token)
 async def login_json(
+    request: Request,
     login_data: LoginRequest,
     db: Session = Depends(get_db)
 ):
@@ -143,6 +209,7 @@ async def login_json(
     Login with JSON body (alternative to form data).
     
     Args:
+        request: FastAPI request object
         login_data: Login credentials
         db: Database session
         
@@ -152,8 +219,21 @@ async def login_json(
     Raises:
         HTTPException: If authentication fails
     """
+    # Get client IP for audit logging
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    user_agent = request.headers.get("User-Agent", "")
+    
     user = authenticate_user(db, login_data.username, login_data.password)
     if not user:
+        # Log failed login attempt
+        audit_logger.log_authentication_event(
+            event_type=AuditEventType.LOGIN_FAILURE,
+            username=login_data.username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            success=False,
+            details={"reason": "invalid_credentials"}
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -173,11 +253,22 @@ async def login_json(
     
     logger.info(f"User logged in: {user.username} (ID: {user.id})")
     
+    # Log successful login
+    audit_logger.log_authentication_event(
+        event_type=AuditEventType.LOGIN_SUCCESS,
+        username=user.username,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        success=True,
+        details={"user_id": str(user.id)}
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/logout")
 async def logout(
+    request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -188,12 +279,27 @@ async def logout(
     extended to implement token blacklisting if needed.
     
     Args:
+        request: FastAPI request object
         current_user: Current authenticated user
         
     Returns:
         Success message
     """
+    # Get client IP for audit logging
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    user_agent = request.headers.get("User-Agent", "")
+    
     logger.info(f"User logged out: {current_user.username} (ID: {current_user.id})")
+    
+    # Log logout event
+    audit_logger.log_authentication_event(
+        event_type=AuditEventType.LOGOUT,
+        username=current_user.username,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        success=True,
+        details={"user_id": str(current_user.id)}
+    )
     
     return {
         "message": "Successfully logged out",

@@ -1,15 +1,41 @@
-import React from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import React, { useState } from 'react';
+import { formatDistanceToNow, isValid } from 'date-fns';
 import { useVirtualScroll } from '../../hooks/useVirtualScroll';
+import { exportAsJSON, exportAsCSV } from '../../utils/exportUtils';
 
 interface HistorySession {
   id: string;
-  timestamp: Date;
+  timestamp: Date | string;
   sourcePreview: string;
   consensusScore: number;
   hallucinationScore: number;
   status: string;
 }
+
+/**
+ * Safely format a timestamp for display
+ * Handles both Date objects and ISO strings, with fallback for invalid dates
+ */
+const formatTimestamp = (timestamp: Date | string): string => {
+  try {
+    let date: Date;
+    if (timestamp instanceof Date) {
+      date = timestamp;
+    } else if (typeof timestamp === 'string') {
+      // Ensure UTC timestamps are parsed correctly
+      const isoString = timestamp.includes('Z') || timestamp.includes('+') || timestamp.includes('-', 10)
+        ? timestamp : timestamp + 'Z';
+      date = new Date(isoString);
+    } else {
+      return 'Just now';
+    }
+    if (!isValid(date) || isNaN(date.getTime())) return 'Just now';
+    if (date > new Date()) return 'Just now'; // Handle future dates
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch {
+    return 'Just now';
+  }
+};
 
 interface VirtualizedHistoryListProps {
   sessions: HistorySession[];
@@ -19,6 +45,79 @@ interface VirtualizedHistoryListProps {
 }
 
 const ITEM_HEIGHT = 120; // Approximate height of each session item
+
+/**
+ * Compact export button for session items
+ * Requirements: 11.1, 11.4
+ */
+const SessionExportButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async (format: 'json' | 'csv', e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExporting(true);
+    setIsOpen(false);
+    
+    try {
+      if (format === 'json') {
+        await exportAsJSON(sessionId);
+      } else {
+        await exportAsCSV(sessionId);
+      }
+    } catch (error) {
+      console.error(`Failed to export as ${format}:`, error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        disabled={isExporting}
+        className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+        title="Export session"
+        aria-label="Export session"
+      >
+        {isExporting ? (
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        )}
+      </button>
+      
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
+          <div className="absolute right-0 z-20 w-32 mt-1 bg-white border border-gray-200 rounded shadow-lg">
+            <button
+              onClick={(e) => handleExport('json', e)}
+              className="w-full px-3 py-2 text-xs text-left text-gray-700 hover:bg-gray-100"
+            >
+              Export JSON
+            </button>
+            <button
+              onClick={(e) => handleExport('csv', e)}
+              className="w-full px-3 py-2 text-xs text-left text-gray-700 hover:bg-gray-100"
+            >
+              Export CSV
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const SessionItem = React.memo<{
   session: HistorySession;
@@ -46,25 +145,32 @@ const SessionItem = React.memo<{
   };
 
   return (
-    <button
+    <div
       onClick={() => onSelect(session.id)}
-      className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+      className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 cursor-pointer ${
         isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
       }`}
       style={{ height: `${ITEM_HEIGHT}px` }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onSelect(session.id)}
     >
-      {/* Timestamp */}
+      {/* Timestamp and Export */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-gray-500">
-          {formatDistanceToNow(session.timestamp, { addSuffix: true })}
+          {formatTimestamp(session.timestamp)}
         </span>
-        <span
-          className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeColor(
-            session.status
-          )}`}
-        >
-          {session.status}
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Export button - Requirements: 11.1, 11.4 */}
+          <SessionExportButton sessionId={session.id} />
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeColor(
+              session.status
+            )}`}
+          >
+            {session.status}
+          </span>
+        </div>
       </div>
 
       {/* Source Preview */}
@@ -127,7 +233,7 @@ const SessionItem = React.memo<{
             </div>
           )}
       </div>
-    </button>
+    </div>
   );
 });
 

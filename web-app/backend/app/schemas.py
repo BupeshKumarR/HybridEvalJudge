@@ -105,6 +105,57 @@ class VerifierVerdictResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# Claim verdict schemas for chat interface
+class ClaimTypeEnum(str, Enum):
+    """Types of claims for specialized routing and display."""
+    NUMERICAL = "numerical"
+    TEMPORAL = "temporal"
+    DEFINITIONAL = "definitional"
+    GENERAL = "general"
+
+
+class ClaimVerdictCreate(BaseModel):
+    """Schema for creating a claim verdict."""
+    claim_text: str = Field(..., min_length=1)
+    claim_type: ClaimTypeEnum
+    verdict: VerifierLabel
+    confidence: float = Field(..., ge=0, le=1)
+    judge_name: Optional[str] = None
+    text_span_start: int = Field(..., ge=0)
+    text_span_end: int = Field(..., ge=0)
+    reasoning: Optional[str] = None
+
+
+class ClaimVerdictResponse(BaseModel):
+    """
+    Response schema for claim verdicts.
+    
+    Requirements: 5.4, 5.5
+    """
+    id: UUID
+    evaluation_id: UUID
+    claim_text: str
+    claim_type: ClaimTypeEnum
+    verdict: VerifierLabel
+    confidence: float = Field(..., ge=0, le=1)
+    judge_name: Optional[str] = None
+    text_span_start: int
+    text_span_end: int
+    reasoning: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClaimVerdictSummary(BaseModel):
+    """Summary of claim verdicts for display."""
+    total_claims: int = 0
+    supported_count: int = 0
+    refuted_count: int = 0
+    not_enough_info_count: int = 0
+    claims_by_type: Dict[str, int] = Field(default_factory=dict)
+
+
 class SessionMetadataResponse(BaseModel):
     total_judges: int = Field(..., gt=0)
     judges_used: List[str]
@@ -135,6 +186,7 @@ class EvaluationSessionResponse(BaseModel):
     completed_at: Optional[datetime] = None
     judge_results: List[JudgeResultResponse] = Field(default_factory=list)
     verifier_verdicts: List[VerifierVerdictResponse] = Field(default_factory=list)
+    claim_verdicts: List["ClaimVerdictResponse"] = Field(default_factory=list)
     session_metadata: Optional[SessionMetadataResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -219,3 +271,59 @@ class EvaluationCompleteEvent(BaseModel):
 class EvaluationErrorEvent(BaseModel):
     event: str = "evaluation_error"
     data: Dict[str, Any]
+
+
+# Chat session schemas
+class MessageRole(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class ChatMessageCreate(BaseModel):
+    content: str = Field(..., min_length=1)
+    role: MessageRole = MessageRole.USER
+
+
+class ChatMessageResponse(BaseModel):
+    id: UUID
+    session_id: UUID
+    role: MessageRole
+    content: str
+    evaluation_id: Optional[UUID] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChatSessionCreate(BaseModel):
+    ollama_model: str = Field(default="llama3.2", min_length=1)
+
+
+class ChatSessionResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    ollama_model: str
+    created_at: datetime
+    updated_at: datetime
+    messages: List[ChatMessageResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChatSessionSummary(BaseModel):
+    id: UUID
+    ollama_model: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = 0
+    last_message_preview: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChatSessionListResponse(BaseModel):
+    sessions: List[ChatSessionSummary]
+    total: int
+    page: int
+    limit: int
+    has_more: bool

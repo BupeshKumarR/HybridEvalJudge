@@ -27,10 +27,16 @@ const SettingsPage: React.FC = () => {
       setError(null);
       const prefs = await getUserPreferences();
       
+      // Get stored Ollama model from localStorage or use default
+      const storedOllamaModel = localStorage.getItem('ollama_model') || 'llama3.2';
+      const storedEnabledJudges = JSON.parse(localStorage.getItem('enabled_judges') || '["groq-llama", "gemini-flash"]');
+      
       setPreferences({
         judgeModels: prefs.default_judge_models || ['gpt-4', 'claude-3'],
         enableRetrieval: prefs.default_retrieval_enabled ?? true,
         aggregationStrategy: prefs.default_aggregation_strategy || 'weighted_average',
+        ollamaModel: storedOllamaModel,
+        enabledJudges: storedEnabledJudges,
       });
     } catch (err: any) {
       console.error('Failed to load preferences:', err);
@@ -41,6 +47,8 @@ const SettingsPage: React.FC = () => {
         judgeModels: ['gpt-4', 'claude-3'],
         enableRetrieval: true,
         aggregationStrategy: 'weighted_average',
+        ollamaModel: 'llama3.2',
+        enabledJudges: ['groq-llama', 'gemini-flash'],
       });
     } finally {
       setLoading(false);
@@ -52,6 +60,14 @@ const SettingsPage: React.FC = () => {
       setSaving(true);
       setError(null);
       setSuccess(false);
+
+      // Save Ollama model and enabled judges to localStorage
+      if (config.ollamaModel) {
+        localStorage.setItem('ollama_model', config.ollamaModel);
+      }
+      if (config.enabledJudges) {
+        localStorage.setItem('enabled_judges', JSON.stringify(config.enabledJudges));
+      }
 
       await updateUserPreferences({
         default_judge_models: config.judgeModels,

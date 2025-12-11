@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useEvaluationStore } from '../../store/evaluationStore';
+import OllamaModelSelector from './OllamaModelSelector';
+import JudgeConfiguration from './JudgeConfiguration';
 
 interface ConfigurationPanelProps {
   onSave?: (config: ConfigurationSettings) => void;
@@ -10,6 +12,8 @@ export interface ConfigurationSettings {
   judgeModels: string[];
   enableRetrieval: boolean;
   aggregationStrategy: string;
+  ollamaModel?: string;
+  enabledJudges?: string[];
 }
 
 const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
@@ -100,6 +104,28 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
           Customize your evaluation settings and preferences
         </p>
       </div>
+
+      {/* Ollama Model Section - Requirements 7.1, 7.3 */}
+      <OllamaModelSelector
+        selectedModel={localConfig.ollamaModel || 'llama3.2'}
+        onModelChange={(model) => {
+          setLocalConfig({ ...localConfig, ollamaModel: model });
+          setHasChanges(true);
+        }}
+      />
+
+      {/* API Judge Configuration Section - Requirements 7.4, 7.5 */}
+      <JudgeConfiguration
+        enabledJudges={localConfig.enabledJudges || ['groq-llama', 'gemini-flash']}
+        onJudgeToggle={(judgeId) => {
+          const currentJudges = localConfig.enabledJudges || ['groq-llama', 'gemini-flash'];
+          const newJudges = currentJudges.includes(judgeId)
+            ? currentJudges.filter((j) => j !== judgeId)
+            : [...currentJudges, judgeId];
+          setLocalConfig({ ...localConfig, enabledJudges: newJudges });
+          setHasChanges(true);
+        }}
+      />
 
       {/* Judge Models Section */}
       <div className="space-y-3">

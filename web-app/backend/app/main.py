@@ -12,9 +12,10 @@ import time
 from contextlib import asynccontextmanager
 
 from .database import init_db
-from .routers import auth, evaluations, preferences
+from .routers import auth, evaluations, preferences, ollama, chat
 from .websocket import socket_app, sio
 from .cache import check_redis_health
+from .security import SecurityHeadersMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -63,6 +64,8 @@ app = FastAPI(
 @app.middleware("http")
 async def add_request_id_middleware(request: Request, call_next):
     """Add unique request ID to each request for tracing."""
+    from .monitoring import performance_monitor, sentry
+    
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
     
@@ -83,6 +86,10 @@ async def add_request_id_middleware(request: Request, call_next):
             f"- Status: {response.status_code} - Time: {process_time:.3f}s [{request_id}]"
         )
         
+        # Record metrics
+        is_error = response.status_code >= 400
+        performance_monitor.record_request(process_time, is_error)
+        
         return response
     except Exception as e:
         process_time = time.time() - start_time
@@ -91,8 +98,24 @@ async def add_request_id_middleware(request: Request, call_next):
             f"- Error: {str(e)} - Time: {process_time:.3f}s [{request_id}]",
             exc_info=True
         )
+        
+        # Record error metrics
+        performance_monitor.record_request(process_time, is_error=True)
+        
+        # Capture to Sentry
+        sentry.capture_exception(e, {
+            "request": {
+                "method": request.method,
+                "path": request.url.path,
+                "request_id": request_id
+            }
+        })
+        
         raise
 
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Add response compression middleware
 app.add_middleware(
@@ -185,13 +208,54 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    redis_healthy = check_redis_health()
+    """Basic health check endpoint for load balancers."""
     return {
         "status": "healthy",
         "service": "llm-judge-auditor-backend",
         "version": "0.1.0",
-        "cache": "available" if redis_healthy else "unavailable"
+        "timestamp": time.time()
+    }
+
+
+@app.get("/health/detailed")
+async def detailed_health_check():
+    """Detailed health check with component status."""
+    from .monitoring import HealthChecker
+    
+    checker = HealthChecker()
+    
+    # Check all components
+    database_health = checker.check_database()
+    cache_health = checker.check_cache()
+    app_info = checker.get_application_info()
+    
+    # Determine overall status
+    overall_status = "healthy"
+    if database_health["status"] != "healthy":
+        overall_status = "degraded"
+    
+    return {
+        "status": overall_status,
+        "timestamp": time.time(),
+        "application": app_info,
+        "components": {
+            "database": database_health,
+            "cache": cache_health
+        }
+    }
+
+
+@app.get("/metrics")
+async def metrics():
+    """Application metrics endpoint."""
+    from .monitoring import HealthChecker, performance_monitor
+    
+    checker = HealthChecker()
+    
+    return {
+        "timestamp": time.time(),
+        "system": checker.get_system_metrics(),
+        "performance": performance_monitor.get_metrics()
     }
 
 
@@ -199,6 +263,8 @@ async def health_check():
 app.include_router(auth.router)
 app.include_router(evaluations.router)
 app.include_router(preferences.router)
+app.include_router(ollama.router)
+app.include_router(chat.router)
 
 # Mount Socket.IO app
 app.mount("/ws", socket_app)

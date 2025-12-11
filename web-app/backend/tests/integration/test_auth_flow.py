@@ -7,14 +7,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from app.main import app
 from app.models import User
-from tests.conftest import test_db, client
+from tests.conftest import db_session, client
 
 
 class TestAuthenticationFlow:
     """Test complete authentication workflows."""
 
     def test_complete_registration_and_login_flow(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """Test user registration followed by login."""
         # Register new user
@@ -51,7 +51,7 @@ class TestAuthenticationFlow:
         assert login_result["token_type"] == "bearer"
 
     def test_authenticated_request_flow(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """Test making authenticated requests."""
         # Register user
@@ -102,7 +102,7 @@ class TestAuthenticationFlow:
         assert response.status_code == 401
 
     def test_duplicate_registration_prevention(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """Test that duplicate usernames/emails are prevented."""
         # Register first user
@@ -148,7 +148,7 @@ class TestAuthenticationFlow:
         assert response.status_code == 400
 
     def test_password_hashing(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """Test that passwords are properly hashed."""
         # Register user
@@ -161,7 +161,7 @@ class TestAuthenticationFlow:
         client.post("/api/v1/auth/register", json=register_data)
 
         # Check database
-        user = test_db.query(User).filter(
+        user = db_session.query(User).filter(
             User.username == "hashtest"
         ).first()
 
@@ -171,7 +171,7 @@ class TestAuthenticationFlow:
         assert len(user.password_hash) > 20  # Hashed passwords are long
 
     def test_login_with_wrong_password(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """Test that login fails with wrong password."""
         # Register user

@@ -342,6 +342,122 @@ class ClaimRouter:
 - Routes temporal claims to judges good with dates/timelines
 - Maintains routing performance metrics to optimize assignments
 
+### 14. Hallucination Metrics Calculator
+
+**Responsibility**: Compute research-backed hallucination quantification metrics
+
+**Interface**:
+```python
+class HallucinationMetricsCalculator:
+    def compute_mihr(claims: List[Claim], verdicts: List[Verdict]) -> float
+    def compute_mahr(responses: List[EvaluationResult]) -> float
+    def compute_factscore(claims: List[Claim], verdicts: List[Verdict]) -> float
+    def compute_consensus_f1(claim_matrix: ClaimVerificationMatrix) -> ConsensusF1Result
+    def compute_fleiss_kappa(ratings: List[List[int]], num_categories: int) -> KappaResult
+    def compute_uncertainty(probabilities: List[List[float]], samples: int) -> UncertaintyResult
+    def generate_hallucination_profile(result: EvaluationResult) -> HallucinationProfile
+
+@dataclass
+class ConsensusF1Result:
+    precision: float
+    recall: float
+    f1: float
+    
+@dataclass
+class KappaResult:
+    kappa: float
+    interpretation: str  # "poor", "fair", "moderate", "substantial", "almost_perfect"
+    observed_agreement: float
+    expected_agreement: float
+
+@dataclass
+class UncertaintyResult:
+    shannon_entropy: float
+    epistemic: float
+    aleatoric: float
+    total: float
+    is_high_uncertainty: bool
+
+@dataclass
+class HallucinationProfile:
+    mihr: Optional[float]
+    mahr: Optional[float]
+    factscore: float
+    consensus_f1: ConsensusF1Result
+    fleiss_kappa: KappaResult
+    uncertainty: UncertaintyResult
+    reliability: str  # "high", "medium", "low"
+    disputed_claims: List[Claim]
+    consensus_claims: List[Claim]
+```
+
+**Key Design Decisions**:
+- MiHR = unsupported_claims / total_claims (per-claim metric)
+- MaHR = responses_with_hallucinations / total_responses (per-response metric)
+- FactScore = verified_claims / total_claims (precision metric)
+- Consensus F1 = 2 × (precision × recall) / (precision + recall)
+- Fleiss' Kappa = (Po - Pe) / (1 - Pe) with standard interpretation thresholds
+- Shannon entropy H(p) = -Σ pᵢ log pᵢ for uncertainty
+- Epistemic = Var(E[p]) across inference samples
+- Aleatoric = E[Var(p)] within inference samples
+- Reliability thresholds: MiHR > 0.3 or Kappa < 0.4 or uncertainty > 0.8 = high risk
+
+### 15. Claim Verification Matrix Builder
+
+**Responsibility**: Build cross-model claim verification matrices for consensus analysis
+
+**Interface**:
+```python
+class ClaimVerificationMatrixBuilder:
+    def build_matrix(responses: Dict[str, List[Claim]]) -> ClaimVerificationMatrix
+    def compute_claim_consensus(matrix: ClaimVerificationMatrix) -> List[ClaimConsensus]
+    def identify_disputed_claims(matrix: ClaimVerificationMatrix, threshold: float) -> List[Claim]
+
+@dataclass
+class ClaimVerificationMatrix:
+    claims: List[Claim]
+    models: List[str]
+    support_matrix: np.ndarray  # shape: (num_claims, num_models), values: 0/1
+    
+@dataclass
+class ClaimConsensus:
+    claim: Claim
+    support_count: int
+    total_models: int
+    consensus_ratio: float
+    is_consensus: bool  # True if majority agrees
+```
+
+**Key Design Decisions**:
+- Tracks which claims appear in which model responses
+- Computes consensus ratio per claim
+- Identifies disputed claims (low agreement)
+- Identifies consensus claims (high agreement)
+
+### 16. False Acceptance Rate Calculator
+
+**Responsibility**: Measure model abstention behavior on unanswerable queries
+
+**Interface**:
+```python
+class FalseAcceptanceCalculator:
+    def evaluate_abstention(query: str, response: str, is_nonexistent: bool) -> AbstentionResult
+    def compute_far(results: List[AbstentionResult]) -> float
+    
+@dataclass
+class AbstentionResult:
+    query: str
+    response: str
+    is_nonexistent_entity: bool
+    did_abstain: bool
+    is_false_acceptance: bool
+```
+
+**Key Design Decisions**:
+- FAR = failed_abstentions / total_nonexistent_queries
+- Detects abstention via response patterns ("I don't know", "no information", etc.)
+- Lower FAR = better model behavior
+
 ## Data Models
 
 ### Core Data Structures
@@ -539,6 +655,42 @@ class ToolkitConfig:
 ### Property 30: Robustness report generation
 *For any* completed adversarial testing session, the system should generate a robustness report showing detection rates for different perturbation types.
 **Validates: Requirements 14.5**
+
+### Property 31: MiHR and MaHR computation correctness
+*For any* set of claims with verdicts, MiHR should equal unsupported_claims / total_claims, and for any set of responses, MaHR should equal responses_with_hallucinations / total_responses, with both values in range [0.0, 1.0].
+**Validates: Requirements 15.1, 15.2, 15.4**
+
+### Property 32: FactScore and Consensus F1 formula correctness
+*For any* set of claims with verification results, FactScore should equal verified_claims / total_claims, and Consensus F1 should equal 2 × (precision × recall) / (precision + recall), returning 0.0 when both precision and recall are zero.
+**Validates: Requirements 16.1, 16.3, 16.4, 16.5**
+
+### Property 33: Claim verification matrix construction
+*For any* set of model responses to the same query, the claim verification matrix should have dimensions (num_unique_claims × num_models) with binary support values.
+**Validates: Requirements 16.2**
+
+### Property 34: Fleiss' Kappa computation correctness
+*For any* rating matrix with 2+ judges, Fleiss' Kappa should equal (Po - Pe) / (1 - Pe), with interpretation labels matching standard thresholds (poor <0.2, fair 0.2-0.4, moderate 0.4-0.6, substantial 0.6-0.8, almost perfect >0.8).
+**Validates: Requirements 17.1, 17.2, 17.3**
+
+### Property 35: Uncertainty quantification correctness
+*For any* probability distribution, Shannon entropy should equal -Σ pᵢ log pᵢ, and for any set of inference samples, total uncertainty should equal epistemic (variance across samples) + aleatoric (expected variance within samples).
+**Validates: Requirements 18.1, 18.2, 18.3, 18.5**
+
+### Property 36: High uncertainty flagging
+*For any* computed uncertainty value exceeding the configured threshold, the response should be flagged as high-uncertainty.
+**Validates: Requirements 18.4**
+
+### Property 37: Hallucination profile completeness and serialization
+*For any* completed evaluation, the hallucination profile should contain MiHR, MaHR, FactScore, F1, Kappa, uncertainty, reliability classification, and claim-level analysis, and should serialize to valid JSON that can be deserialized back to an equivalent profile.
+**Validates: Requirements 19.1, 19.2, 19.3, 19.4**
+
+### Property 38: High risk flagging thresholds
+*For any* hallucination profile where MiHR > 0.3 or Kappa < 0.4 or uncertainty > 0.8, the profile should be flagged as high risk with reliability = "low".
+**Validates: Requirements 19.5**
+
+### Property 39: False Acceptance Rate computation
+*For any* set of non-existent entity queries, FAR should equal failed_abstentions / total_queries, with correct classification of abstentions (correct refusal) vs responses (false acceptance).
+**Validates: Requirements 20.1, 20.2, 20.3, 20.4**
 
 ## Error Handling
 
@@ -1214,6 +1366,50 @@ robustness_report = tester.test_robustness(
 
 print(f"Detection Rate: {robustness_report.detection_rate}")
 print(f"False Positive Rate: {robustness_report.false_positive_rate}")
+```
+
+**Hallucination Quantification**:
+
+```python
+from llm_judge_auditor import EvaluationToolkit, HallucinationMetricsCalculator
+
+toolkit = EvaluationToolkit.from_preset("research")
+
+# Evaluate with full hallucination metrics
+result = toolkit.evaluate(source, candidate)
+
+# Get hallucination profile
+profile = result.hallucination_profile
+print(f"MiHR: {profile.mihr:.3f}")  # Micro Hallucination Rate
+print(f"MaHR: {profile.mahr:.3f}")  # Macro Hallucination Rate
+print(f"FactScore: {profile.factscore:.3f}")
+print(f"Consensus F1: {profile.consensus_f1.f1:.3f}")
+print(f"Fleiss' Kappa: {profile.fleiss_kappa.kappa:.3f} ({profile.fleiss_kappa.interpretation})")
+print(f"Uncertainty: {profile.uncertainty.total:.3f}")
+print(f"Reliability: {profile.reliability}")
+
+# Check disputed claims
+for claim in profile.disputed_claims:
+    print(f"Disputed: {claim.text}")
+
+# Cross-model consensus analysis
+responses = {
+    "llama3": toolkit.evaluate_with_model(source, candidate, "llama3"),
+    "mistral": toolkit.evaluate_with_model(source, candidate, "mistral"),
+    "phi3": toolkit.evaluate_with_model(source, candidate, "phi3"),
+}
+matrix = HallucinationMetricsCalculator.build_claim_matrix(responses)
+consensus_f1 = HallucinationMetricsCalculator.compute_consensus_f1(matrix)
+print(f"Cross-model Precision: {consensus_f1.precision:.3f}")
+print(f"Cross-model Recall: {consensus_f1.recall:.3f}")
+
+# Uncertainty quantification with multiple samples
+uncertainty = toolkit.compute_uncertainty(source, candidate, num_samples=5)
+print(f"Shannon Entropy: {uncertainty.shannon_entropy:.3f}")
+print(f"Epistemic: {uncertainty.epistemic:.3f}")
+print(f"Aleatoric: {uncertainty.aleatoric:.3f}")
+if uncertainty.is_high_uncertainty:
+    print("WARNING: High uncertainty - consider human review")
 ```
 
 **Fine-tuning a Verifier**:

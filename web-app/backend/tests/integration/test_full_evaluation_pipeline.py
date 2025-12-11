@@ -8,14 +8,14 @@ from sqlalchemy.orm import Session
 from app.main import app
 from app.models import EvaluationSession, JudgeResult, VerifierVerdict
 from app.database import get_db
-from tests.conftest import test_db, client, test_user, auth_headers
+from tests.conftest import db_session, client, created_user, auth_headers
 
 
 class TestFullEvaluationPipeline:
     """Test the complete evaluation pipeline end-to-end."""
 
     def test_evaluation_creates_database_records(
-        self, client: TestClient, auth_headers: dict, test_db: Session
+        self, client: TestClient, auth_headers: dict, db_session: Session
     ):
         """Test that evaluation creates all necessary database records."""
         # Create evaluation request
@@ -41,7 +41,7 @@ class TestFullEvaluationPipeline:
         session_id = data["session_id"]
 
         # Verify session was created in database
-        session = test_db.query(EvaluationSession).filter(
+        session = db_session.query(EvaluationSession).filter(
             EvaluationSession.id == session_id
         ).first()
 
@@ -51,7 +51,7 @@ class TestFullEvaluationPipeline:
         assert session.status in ["pending", "completed"]
 
     def test_evaluation_with_multiple_judges(
-        self, client: TestClient, auth_headers: dict, test_db: Session
+        self, client: TestClient, auth_headers: dict, db_session: Session
     ):
         """Test evaluation with multiple judge models."""
         evaluation_data = {
@@ -75,7 +75,7 @@ class TestFullEvaluationPipeline:
         session_id = data["session_id"]
 
         # Verify session configuration
-        session = test_db.query(EvaluationSession).filter(
+        session = db_session.query(EvaluationSession).filter(
             EvaluationSession.id == session_id
         ).first()
 
@@ -84,7 +84,7 @@ class TestFullEvaluationPipeline:
         assert session.config["aggregation_strategy"] == "median"
 
     def test_evaluation_retrieval_and_storage(
-        self, client: TestClient, auth_headers: dict, test_db: Session
+        self, client: TestClient, auth_headers: dict, db_session: Session
     ):
         """Test that evaluation results are properly stored."""
         evaluation_data = {
@@ -123,7 +123,7 @@ class TestFullEvaluationPipeline:
         assert "status" in result
 
     def test_evaluation_list_and_pagination(
-        self, client: TestClient, auth_headers: dict, test_db: Session
+        self, client: TestClient, auth_headers: dict, db_session: Session
     ):
         """Test listing evaluations with pagination."""
         # Create multiple evaluations
@@ -183,14 +183,14 @@ class TestFullEvaluationPipeline:
         assert response.status_code == 422  # Validation error
 
     def test_evaluation_user_isolation(
-        self, client: TestClient, test_db: Session
+        self, client: TestClient, db_session: Session
     ):
         """Test that users can only access their own evaluations."""
         # Create two users
         from app.auth import create_user, create_access_token
 
-        user1 = create_user(test_db, "user1@test.com", "user1", "password123")
-        user2 = create_user(test_db, "user2@test.com", "user2", "password123")
+        user1 = create_user(db_session, "user1@test.com", "user1", "password123")
+        user2 = create_user(db_session, "user2@test.com", "user2", "password123")
 
         token1 = create_access_token({"sub": user1.username})
         token2 = create_access_token({"sub": user2.username})

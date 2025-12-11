@@ -11,9 +11,23 @@ export interface WebSocketEvents {
     config: any;
   };
 
+  chat_message: {
+    chat_session_id: string;
+    question: string;
+    model?: string;
+  };
+
+  join_chat_session: {
+    chat_session_id: string;
+  };
+
+  leave_chat_session: {
+    chat_session_id: string;
+  };
+
   // Server -> Client
   evaluation_progress: {
-    stage: 'retrieval' | 'verification' | 'judging' | 'aggregation';
+    stage: 'generation' | 'claim_extraction' | 'verification' | 'scoring' | 'aggregation';
     progress: number;
     message: string;
   };
@@ -24,6 +38,16 @@ export interface WebSocketEvents {
     confidence: number;
     reasoning: string;
     flagged_issues: any[];
+  };
+
+  judge_verdict: {
+    judge_name: string;
+    score: number;
+    confidence: number;
+    reasoning: string;
+    issues: any[];
+    status?: 'available' | 'unavailable' | 'failed' | 'timeout' | 'rate_limited';
+    error_message?: string;
   };
 
   evaluation_complete: {
@@ -38,6 +62,71 @@ export interface WebSocketEvents {
     error_type: string;
     message: string;
     recovery_suggestions: string[];
+  };
+
+  // Ollama-specific events (Requirements 2.4, 9.3)
+  generation_started: {
+    chat_session_id: string;
+    model: string;
+  };
+
+  stream_token: {
+    token: string;
+    done: boolean;
+  };
+
+  generation_complete: {
+    chat_session_id: string;
+    message_id: string;
+    response: string;
+  };
+
+  generation_error: {
+    error: 'connection_error' | 'model_not_found' | 'timeout' | 'service_error';
+    message: string;
+    suggestions: string[];
+  };
+
+  // Chat evaluation events
+  chat_evaluation_complete: {
+    chat_session_id: string;
+    message_id: string;
+    evaluation_id: string;
+    consensus_score: number;
+    hallucination_score: number;
+    confidence_interval: [number, number];
+    inter_judge_agreement: number;
+    claim_verdicts: any[];
+    status: string;
+    judge_statuses?: Array<{
+      judge_name: string;
+      status: 'available' | 'unavailable' | 'failed' | 'timeout' | 'rate_limited';
+      error_message?: string;
+    }>;
+  };
+
+  chat_evaluation_error: {
+    chat_session_id: string;
+    message_id: string;
+    error: string;
+    message: string;
+  };
+
+  message_saved: {
+    message_id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    created_at: string;
+  };
+
+  chat_session_joined: {
+    chat_session_id: string;
+    message: string;
+  };
+
+  chat_session_left: {
+    chat_session_id: string;
+    message: string;
   };
 
   connect: void;
@@ -63,11 +152,21 @@ class WebSocketService {
 
     const wsUrl = url || process.env.REACT_APP_WS_URL || 'http://localhost:8000';
     const token = useAuthStore.getState().token;
+    
+    console.log('WebSocket connecting to:', wsUrl);
+    console.log('Token available:', !!token);
+    console.log('Token (first 20 chars):', token ? token.substring(0, 20) + '...' : 'null');
+
+    if (!token) {
+      console.error('WebSocket: No auth token available, cannot connect');
+      return;
+    }
 
     this.socket = io(wsUrl, {
       auth: {
         token,
       },
+      path: '/ws/socket.io',  // Match the backend mount path
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
@@ -104,16 +203,22 @@ class WebSocketService {
     event: K,
     data: WebSocketEvents[K]
   ): void {
+    console.log(`WebSocket emit: ${event}`, data);
+    console.log('Socket connected:', this.socket?.connected);
+    
     if (!this.socket?.connected) {
-      console.error('WebSocket not connected');
+      console.error('WebSocket not connected, cannot emit:', event);
       return;
     }
 
     this.socket.emit(event, data);
+    console.log(`WebSocket emit successful: ${event}`);
   }
 
   /**
    * Listen to event from server
+   * Note: Handlers are stored in eventHandlers map and called via notifyHandlers
+   * We do NOT add handlers directly to socket to avoid duplicate calls
    */
   on<K extends keyof WebSocketEvents>(
     event: K,
@@ -124,10 +229,8 @@ class WebSocketService {
     }
 
     this.eventHandlers.get(event as string)!.add(handler);
-
-    if (this.socket) {
-      this.socket.on(event as string, handler);
-    }
+    // Note: Do NOT add handler directly to socket - setupEventListeners handles
+    // routing events to notifyHandlers which calls all registered handlers
   }
 
   /**
@@ -139,14 +242,9 @@ class WebSocketService {
   ): void {
     if (handler) {
       this.eventHandlers.get(event as string)?.delete(handler);
-      if (this.socket) {
-        this.socket.off(event as string, handler);
-      }
+      // Note: Do NOT remove from socket directly - handlers are managed via eventHandlers map
     } else {
       this.eventHandlers.delete(event as string);
-      if (this.socket) {
-        this.socket.off(event as string);
-      }
     }
   }
 
@@ -188,12 +286,53 @@ class WebSocketService {
       this.notifyHandlers('judge_result', data);
     });
 
+    this.socket.on('judge_verdict', (data) => {
+      this.notifyHandlers('judge_verdict', data);
+    });
+
     this.socket.on('evaluation_complete', (data) => {
       this.notifyHandlers('evaluation_complete', data);
     });
 
     this.socket.on('evaluation_error', (data) => {
       this.notifyHandlers('evaluation_error', data);
+    });
+
+    // Chat and Ollama events (Requirements 2.4, 9.1, 9.3)
+    this.socket.on('generation_started', (data) => {
+      this.notifyHandlers('generation_started', data);
+    });
+
+    this.socket.on('stream_token', (data) => {
+      this.notifyHandlers('stream_token', data);
+    });
+
+    this.socket.on('generation_complete', (data) => {
+      this.notifyHandlers('generation_complete', data);
+    });
+
+    this.socket.on('generation_error', (data) => {
+      this.notifyHandlers('generation_error', data);
+    });
+
+    this.socket.on('chat_evaluation_complete', (data) => {
+      this.notifyHandlers('chat_evaluation_complete', data);
+    });
+
+    this.socket.on('chat_evaluation_error', (data) => {
+      this.notifyHandlers('chat_evaluation_error', data);
+    });
+
+    this.socket.on('message_saved', (data) => {
+      this.notifyHandlers('message_saved', data);
+    });
+
+    this.socket.on('chat_session_joined', (data) => {
+      this.notifyHandlers('chat_session_joined', data);
+    });
+
+    this.socket.on('chat_session_left', (data) => {
+      this.notifyHandlers('chat_session_left', data);
     });
   }
 

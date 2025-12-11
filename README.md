@@ -19,6 +19,14 @@ LLM Judge Auditor is a hybrid evaluation system that combines specialized fact-c
 - 📊 **Statistical Metrics**: Confidence intervals, inter-judge agreement, hallucination scores
 - ⚡ **Performance Optimized**: Parallel evaluation, caching, and 8-bit quantization support
 
+#### Hallucination Quantification
+- 📈 **MiHR/MaHR**: Micro and Macro hallucination rates for claim-level and response-level analysis
+- 🎯 **FactScore**: Factual precision metric (verified_claims / total_claims)
+- 🤝 **Consensus F1**: Cross-model agreement with precision, recall, and F1 scores
+- 📊 **Fleiss' Kappa**: Inter-judge agreement statistic with interpretation
+- 🔮 **Uncertainty Quantification**: Shannon entropy with epistemic/aleatoric decomposition
+- ⚠️ **Risk Assessment**: Automatic high-risk flagging based on configurable thresholds
+
 #### Web Application
 - 💬 **Chat Interface**: Interactive evaluation with real-time streaming
 - 📈 **Rich Visualizations**: Judge comparisons, confidence gauges, hallucination metrics
@@ -447,7 +455,8 @@ See [docs/guides/API_KEY_SETUP.md](docs/guides/API_KEY_SETUP.md) for detailed se
 - **Verifier Component**: Specialized fact-checking models
 - **Retrieval Component**: Fetches relevant context from knowledge bases
 - **Aggregation Engine**: Combines judge scores with statistical methods
-- **Metrics Calculator**: Computes confidence, agreement, and hallucination scores
+- **Hallucination Metrics**: Research-backed quantification (MiHR, MaHR, FactScore, Fleiss' Kappa)
+- **Uncertainty Quantification**: Shannon entropy with epistemic/aleatoric decomposition
 - **Report Generator**: Creates comprehensive evaluation reports
 
 ### Technology Stack
@@ -597,6 +606,7 @@ def test_evaluation_consistency(source, candidate):
 ### Component Documentation
 - [Usage Guide](docs/USAGE_GUIDE.md)
 - [CLI Usage](docs/CLI_USAGE.md)
+- [Hallucination Metrics](docs/HALLUCINATION_METRICS.md)
 - [Error Handling](docs/ERROR_HANDLING.md)
 - [Performance Optimization](docs/PERFORMANCE_OPTIMIZATION.md)
 - [Plugin System](docs/PLUGIN_SYSTEM.md)

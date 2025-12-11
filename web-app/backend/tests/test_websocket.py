@@ -195,3 +195,140 @@ class TestActiveConnections:
         
         # Cleanup
         del active_connections[session_id]
+
+
+@pytest.mark.asyncio
+class TestChatWebSocketSessionAccess:
+    """Tests for chat WebSocket session access verification."""
+    
+    async def test_verify_chat_session_access_valid(self, created_user, test_chat_session):
+        """Test chat session access verification with valid access."""
+        from app.websocket import verify_chat_session_access
+        
+        has_access = await verify_chat_session_access(
+            created_user.id,
+            str(test_chat_session.id)
+        )
+        assert has_access is True
+    
+    async def test_verify_chat_session_access_invalid_user(self, test_chat_session):
+        """Test chat session access verification with invalid user."""
+        from app.websocket import verify_chat_session_access
+        
+        random_user_id = uuid4()
+        has_access = await verify_chat_session_access(
+            random_user_id,
+            str(test_chat_session.id)
+        )
+        assert has_access is False
+    
+    async def test_verify_chat_session_access_invalid_session(self, created_user):
+        """Test chat session access verification with invalid session."""
+        from app.websocket import verify_chat_session_access
+        
+        random_session_id = str(uuid4())
+        has_access = await verify_chat_session_access(
+            created_user.id,
+            random_session_id
+        )
+        assert has_access is False
+
+
+@pytest.mark.asyncio
+class TestChatWebSocketEmitters:
+    """Tests for chat WebSocket event emitters."""
+    
+    @patch('app.websocket.sio.emit')
+    async def test_emit_to_chat_session(self, mock_emit):
+        """Test emitting to chat session."""
+        from app.websocket import emit_to_chat_session
+        
+        chat_session_id = str(uuid4())
+        
+        await emit_to_chat_session(
+            chat_session_id,
+            'test_event',
+            {'data': 'test'}
+        )
+        
+        mock_emit.assert_called_once()
+        call_args = mock_emit.call_args
+        assert call_args[0][0] == 'test_event'
+        assert call_args[0][1] == {'data': 'test'}
+        assert call_args[1]['room'] == f"chat_{chat_session_id}"
+    
+    @patch('app.websocket.sio.emit')
+    async def test_emit_chat_evaluation_progress(self, mock_emit):
+        """Test emitting chat evaluation progress."""
+        from app.websocket import emit_chat_evaluation_progress
+        
+        room_id = f"chat_{uuid4()}"
+        
+        await emit_chat_evaluation_progress(
+            room_id,
+            'claim_extraction',
+            50.0,
+            'Extracting claims...'
+        )
+        
+        mock_emit.assert_called_once()
+        call_args = mock_emit.call_args
+        assert call_args[0][0] == 'evaluation_progress'
+        assert call_args[0][1]['stage'] == 'claim_extraction'
+        assert call_args[0][1]['progress'] == 50.0
+        assert call_args[0][1]['message'] == 'Extracting claims...'
+    
+    @patch('app.websocket.sio.emit')
+    async def test_emit_chat_judge_verdict(self, mock_emit):
+        """Test emitting chat judge verdict."""
+        from app.websocket import emit_chat_judge_verdict
+        
+        room_id = f"chat_{uuid4()}"
+        
+        await emit_chat_judge_verdict(
+            room_id,
+            'groq-llama-3.3-70b',
+            85.5,
+            0.9,
+            'Test reasoning',
+            [{'type': 'factual_error', 'severity': 'low', 'description': 'Minor issue'}]
+        )
+        
+        mock_emit.assert_called_once()
+        call_args = mock_emit.call_args
+        assert call_args[0][0] == 'judge_verdict'
+        assert call_args[0][1]['judge_name'] == 'groq-llama-3.3-70b'
+        assert call_args[0][1]['score'] == 85.5
+        assert call_args[0][1]['confidence'] == 0.9
+        assert call_args[0][1]['reasoning'] == 'Test reasoning'
+        assert len(call_args[0][1]['issues']) == 1
+    
+    @patch('app.websocket.sio.emit')
+    async def test_emit_stream_token(self, mock_emit):
+        """Test emitting stream token."""
+        from app.websocket import emit_stream_token
+        
+        chat_session_id = str(uuid4())
+        
+        await emit_stream_token(chat_session_id, 'Hello', done=False)
+        
+        mock_emit.assert_called_once()
+        call_args = mock_emit.call_args
+        assert call_args[0][0] == 'stream_token'
+        assert call_args[0][1]['token'] == 'Hello'
+        assert call_args[0][1]['done'] is False
+    
+    @patch('app.websocket.sio.emit')
+    async def test_emit_stream_token_done(self, mock_emit):
+        """Test emitting stream token with done flag."""
+        from app.websocket import emit_stream_token
+        
+        chat_session_id = str(uuid4())
+        
+        await emit_stream_token(chat_session_id, '', done=True)
+        
+        mock_emit.assert_called_once()
+        call_args = mock_emit.call_args
+        assert call_args[0][0] == 'stream_token'
+        assert call_args[0][1]['token'] == ''
+        assert call_args[0][1]['done'] is True

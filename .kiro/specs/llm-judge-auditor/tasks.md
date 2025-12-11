@@ -235,3 +235,134 @@
   - Optimize model loading and caching
   - Add parallel processing for judge ensemble
   - _Requirements: 1.1, 1.2, 5.1_
+
+---
+
+## Hallucination Quantification Tasks (Requirements 15-20)
+
+- [x] 33. Implement Hallucination Metrics Calculator core
+  - [x] 33.1 Create HallucinationMetricsCalculator class with data structures
+    - Create ConsensusF1Result, KappaResult, UncertaintyResult, HallucinationProfile dataclasses
+    - Add configuration for thresholds (MiHR > 0.3, Kappa < 0.4, uncertainty > 0.8)
+    - _Requirements: 15.1, 15.2, 19.1_
+  - [x] 33.2 Implement MiHR computation
+    - Compute MiHR = unsupported_claims / total_claims
+    - Handle zero claims edge case (return None with flag)
+    - Ensure output in range [0.0, 1.0]
+    - _Requirements: 15.1, 15.3, 15.4, 15.5_
+  - [x] 33.3 Implement MaHR computation
+    - Compute MaHR = responses_with_hallucinations / total_responses
+    - Ensure output in range [0.0, 1.0]
+    - _Requirements: 15.2, 15.4_
+  - [x] 33.4 Write property test for MiHR/MaHR
+    - **Property 31: MiHR and MaHR computation correctness**
+    - **Validates: Requirements 15.1, 15.2, 15.4**
+
+- [x] 34. Implement FactScore and Consensus F1
+  - [x] 34.1 Implement FactScore computation
+    - Compute FactScore = verified_claims / total_claims
+    - Ensure output in range [0.0, 1.0]
+    - _Requirements: 16.1_
+  - [x] 34.2 Implement ClaimVerificationMatrixBuilder
+    - Build matrix tracking which claims appear in which model responses
+    - Matrix dimensions: (num_unique_claims × num_models)
+    - _Requirements: 16.2_
+  - [x] 34.3 Implement Consensus F1 computation
+    - Compute precision = model_claims_supported_by_others / model_claims
+    - Compute recall = consensus_claims_included / total_consensus_claims
+    - Compute F1 = 2 × (precision × recall) / (precision + recall)
+    - Handle zero division (return 0.0)
+    - _Requirements: 16.3, 16.4, 16.5_
+  - [x] 34.4 Write property test for FactScore and Consensus F1
+    - **Property 32: FactScore and Consensus F1 formula correctness**
+    - **Validates: Requirements 16.1, 16.3, 16.4, 16.5**
+  - [x] 34.5 Write property test for claim verification matrix
+    - **Property 33: Claim verification matrix construction**
+    - **Validates: Requirements 16.2**
+
+- [x] 35. Implement Fleiss' Kappa for inter-judge agreement
+  - [x] 35.1 Implement Fleiss' Kappa computation
+    - Compute observed agreement (Po)
+    - Compute expected agreement (Pe)
+    - Compute κ = (Po - Pe) / (1 - Pe)
+    - Handle fewer than 2 judges (return undefined with error)
+    - _Requirements: 17.1, 17.2, 17.4_
+  - [x] 35.2 Implement Kappa interpretation
+    - Map kappa values to labels: poor (<0.2), fair (0.2-0.4), moderate (0.4-0.6), substantial (0.6-0.8), almost perfect (>0.8)
+    - _Requirements: 17.3_
+  - [x] 35.3 Write property test for Fleiss' Kappa
+    - **Property 34: Fleiss' Kappa computation correctness**
+    - **Validates: Requirements 17.1, 17.2, 17.3**
+
+- [x] 36. Implement uncertainty quantification
+  - [x] 36.1 Implement Shannon entropy computation
+    - Compute H(p) = -Σ pᵢ log pᵢ for probability distributions
+    - Handle edge cases (zero probabilities)
+    - _Requirements: 18.1_
+  - [x] 36.2 Implement epistemic/aleatoric decomposition
+    - Compute epistemic = Var(E[p]) across inference samples
+    - Compute aleatoric = E[Var(p)] within inference samples
+    - Compute total = epistemic + aleatoric
+    - _Requirements: 18.2, 18.3, 18.5_
+  - [x] 36.3 Implement high uncertainty flagging
+    - Flag responses where uncertainty exceeds threshold
+    - _Requirements: 18.4_
+  - [x] 36.4 Write property test for uncertainty quantification
+    - **Property 35: Uncertainty quantification correctness**
+    - **Validates: Requirements 18.1, 18.2, 18.3, 18.5**
+  - [x] 36.5 Write property test for high uncertainty flagging
+    - **Property 36: High uncertainty flagging**
+    - **Validates: Requirements 18.4**
+
+- [x] 37. Implement Hallucination Profile generation
+  - [x] 37.1 Implement profile compilation
+    - Compile MiHR, MaHR, FactScore, F1, Kappa, uncertainty into profile
+    - Include claim-level analysis (disputed and consensus claims)
+    - _Requirements: 19.1, 19.3_
+  - [x] 37.2 Implement reliability classification
+    - Assign high/medium/low based on thresholds
+    - Flag high risk when MiHR > 0.3 or Kappa < 0.4 or uncertainty > 0.8
+    - _Requirements: 19.2, 19.5_
+  - [x] 37.3 Implement JSON serialization
+    - Serialize profile to JSON format
+    - Ensure round-trip consistency
+    - _Requirements: 19.4_
+  - [x] 37.4 Write property test for hallucination profile
+    - **Property 37: Hallucination profile completeness and serialization**
+    - **Validates: Requirements 19.1, 19.2, 19.3, 19.4**
+  - [x] 37.5 Write property test for high risk flagging
+    - **Property 38: High risk flagging thresholds**
+    - **Validates: Requirements 19.5**
+
+- [x] 38. Implement False Acceptance Rate calculator
+  - [x] 38.1 Create FalseAcceptanceCalculator class
+    - Track abstention vs response for non-existent entity queries
+    - Classify responses as correct refusal or false acceptance
+    - _Requirements: 20.1, 20.3, 20.4_
+  - [x] 38.2 Implement FAR computation
+    - Compute FAR = failed_abstentions / total_nonexistent_queries
+    - _Requirements: 20.2_
+  - [x] 38.3 Write property test for FAR
+    - **Property 39: False Acceptance Rate computation**
+    - **Validates: Requirements 20.1, 20.2, 20.3, 20.4**
+
+- [x] 39. Integrate hallucination metrics into EvaluationToolkit
+  - [x] 39.1 Add hallucination profile to EvaluationResult
+    - Include HallucinationProfile in evaluation results
+    - _Requirements: 19.1_
+  - [x] 39.2 Update ReportGenerator for hallucination metrics
+    - Add hallucination metrics to JSON/CSV/text reports
+    - _Requirements: 8.1, 19.4_
+
+- [x] 40. Checkpoint - Ensure all hallucination quantification tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 41. Create hallucination quantification examples and documentation
+  - Write example showing MiHR/MaHR computation
+  - Write example showing cross-model consensus analysis
+  - Write example showing uncertainty quantification
+  - Update README with hallucination metrics documentation
+  - _Requirements: 15-20_
+
+- [ ] 42. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

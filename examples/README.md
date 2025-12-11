@@ -358,6 +358,105 @@ Validating the reliability and consistency of the evaluation system.
 
 ---
 
+### Hallucination Quantification Examples
+
+These examples demonstrate research-backed hallucination quantification metrics.
+
+#### Hallucination Metrics (`hallucination_metrics_example.py`)
+
+```bash
+python examples/hallucination_metrics_example.py
+```
+
+Computing MiHR, MaHR, FactScore, and basic uncertainty metrics.
+
+**What it demonstrates**:
+- MiHR (Micro Hallucination Rate): unsupported_claims / total_claims
+- MaHR (Macro Hallucination Rate): responses_with_hallucinations / total_responses
+- FactScore: verified_claims / total_claims
+- High-risk detection based on configurable thresholds
+- Custom threshold configuration
+
+**Recommended for**: Quantifying hallucination rates, research validation
+
+---
+
+#### Cross-Model Consensus Analysis (`consensus_analysis_example.py`)
+
+```bash
+python examples/consensus_analysis_example.py
+```
+
+Analyzing agreement across multiple models using claim verification matrices.
+
+**What it demonstrates**:
+- Building claim verification matrices
+- Computing Consensus F1 scores (precision, recall, F1)
+- Computing Fleiss' Kappa for inter-judge agreement
+- Identifying disputed and consensus claims
+- Interpreting agreement levels (poor, fair, moderate, substantial, almost perfect)
+
+**Recommended for**: Multi-model evaluation, inter-judge agreement analysis
+
+---
+
+#### Uncertainty Quantification (`uncertainty_quantification_example.py`)
+
+```bash
+python examples/uncertainty_quantification_example.py
+```
+
+Quantifying model uncertainty using Shannon entropy and epistemic/aleatoric decomposition.
+
+**What it demonstrates**:
+- Shannon entropy: H(p) = -Σ pᵢ log pᵢ
+- Epistemic uncertainty: Var(E[p]) across inference samples
+- Aleatoric uncertainty: E[Var(p)] within inference samples
+- High uncertainty flagging for hallucination risk
+- Practical application to hallucination detection
+
+**Recommended for**: Understanding model confidence, hallucination risk assessment
+
+---
+
+#### Hallucination Profile Generation (`hallucination_profile_example.py`)
+
+```bash
+python examples/hallucination_profile_example.py
+```
+
+Generating comprehensive hallucination profiles with all metrics combined.
+
+**What it demonstrates**:
+- Combining all hallucination metrics into a single profile
+- Reliability classification (high, medium, low)
+- High-risk flagging (MiHR > 0.3, Kappa < 0.4, uncertainty > 0.8)
+- JSON serialization and round-trip consistency
+- Claim-level analysis (disputed vs consensus claims)
+
+**Recommended for**: Comprehensive hallucination analysis, reporting
+
+---
+
+#### False Acceptance Rate (`false_acceptance_rate_example.py`)
+
+```bash
+python examples/false_acceptance_rate_example.py
+```
+
+Measuring model abstention behavior on queries about non-existent entities.
+
+**What it demonstrates**:
+- Evaluating abstention vs response behavior
+- Computing FAR: failed_abstentions / total_nonexistent_queries
+- Custom abstention detection patterns
+- Case-sensitive and case-insensitive matching
+- Batch evaluation of multiple queries
+
+**Recommended for**: Testing model refusal behavior, hallucination prevention
+
+---
+
 #### Benchmark Validation (`benchmark_validation_example.py`)
 
 ```bash
