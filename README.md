@@ -13,11 +13,12 @@ LLM Judge Auditor is a hybrid evaluation system that combines specialized fact-c
 ### Key Features
 
 #### Core Evaluation Engine
-- 🎯 **Multi-Judge Ensemble**: Combine multiple LLM judges (GPT-4, Claude, Gemini, Groq) for robust evaluation
+- 🎯 **Multi-Judge Ensemble**: Combine multiple LLM judges (GPT-4, Claude, Gemini, Groq, Ollama) for robust evaluation
 - 🔍 **Specialized Verifiers**: Fact-checking models for claim verification
 - 📚 **Retrieval-Augmented**: Optional integration with external knowledge bases
 - 📊 **Statistical Metrics**: Confidence intervals, inter-judge agreement, hallucination scores
 - ⚡ **Performance Optimized**: Parallel evaluation, caching, and 8-bit quantization support
+- 🦙 **Local LLM Support**: Ollama integration for privacy-focused, offline evaluation
 
 #### Hallucination Quantification
 - 📈 **MiHR/MaHR**: Micro and Macro hallucination rates for claim-level and response-level analysis
@@ -35,650 +36,374 @@ LLM Judge Auditor is a hybrid evaluation system that combines specialized fact-c
 - 🔐 **Authentication**: Secure user management with JWT tokens
 - 🎨 **Responsive Design**: Works on desktop, tablet, and mobile
 
-#### Developer Tools
-- 🔌 **Plugin System**: Extensible architecture for custom components
-- 🧪 **Property-Based Testing**: Rigorous correctness validation
-- 📝 **Comprehensive API**: RESTful API with OpenAPI/Swagger documentation
-- 🔄 **WebSocket Support**: Real-time evaluation progress streaming
-- 🐳 **Docker Ready**: Full containerization with Docker Compose
-
 ---
 
-## 📋 Table of Contents
+## 🏗️ Architecture
 
-- [Quick Start](#-quick-start)
-- [Installation](#-installation)
-- [Web Application](#-web-application)
-- [Python Toolkit Usage](#-python-toolkit-usage)
-- [API Documentation](#-api-documentation)
-- [Configuration](#-configuration)
-- [Architecture](#-architecture)
-- [Development](#-development)
-- [Testing](#-testing)
-- [Documentation](#-documentation)
-- [Contributing](#-contributing)
-- [License](#-license)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Web Application                               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐             │
+│  │  Frontend   │    │   Backend   │    │  Database   │             │
+│  │  (React +   │◄──►│  (FastAPI)  │◄──►│ PostgreSQL  │             │
+│  │ TypeScript) │    │             │    │  or SQLite  │             │
+│  └─────────────┘    └──────┬──────┘    └─────────────┘             │
+│         │                  │                                        │
+│         │           ┌──────▼──────┐    ┌─────────────┐             │
+│         │           │   Redis     │    │   Ollama    │             │
+│         └──────────►│   Cache     │    │  (Local LLM)│             │
+│                     └─────────────┘    └─────────────┘             │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   Python Evaluation Toolkit                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ │
+│  │   Judge     │  │  Verifier   │  │  Retrieval  │  │   Claim   │ │
+│  │  Ensemble   │  │  Component  │  │  Component  │  │   Router  │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └───────────┘ │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ │
+│  │ Aggregation │  │ Hallucin.   │  │   Report    │  │  Streaming│ │
+│  │   Engine    │  │  Metrics    │  │  Generator  │  │  Evaluator│ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └───────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, TailwindCSS, Recharts |
+| Backend | FastAPI, SQLAlchemy, Socket.IO, JWT Auth |
+| Database | PostgreSQL (production), SQLite (development) |
+| Cache | Redis |
+| Local LLM | Ollama |
+| API Judges | Groq (free), Gemini (free), OpenAI, Anthropic |
+| Infrastructure | Docker, Docker Compose, Nginx |
 
 ---
 
 ## 🚀 Quick Start
 
-### Option 1: Web Application (Recommended)
+### Option 1: Docker (Recommended)
+
+The fastest way to get started with full PostgreSQL, Redis, and all services:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/llm-judge-auditor.git
-cd llm-judge-auditor
+git clone https://github.com/BupeshKumarR/HybridEvalJudge.git
+cd llm-judge-auditor/web-app
 
-# Start with Docker Compose
-cd web-app
+# Start all services
 docker-compose up -d
 
 # Access the application
 open http://localhost:3000
 ```
 
-### Option 2: Python Toolkit
+This starts:
+- **Frontend** on http://localhost:3000
+- **Backend API** on http://localhost:8000
+- **PostgreSQL** on port 5432
+- **Redis** on port 6379
+
+### Option 2: Local Development (No Docker)
+
+For development without Docker, using SQLite:
+
+```bash
+# Clone and setup
+git clone https://github.com/BupeshKumarR/HybridEvalJudge.git
+cd llm-judge-auditor
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start backend with SQLite fallback
+cd web-app/backend
+USE_SQLITE=true uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# In another terminal, start frontend
+cd web-app/frontend
+npm install
+npm start
+```
+
+### Option 3: Python Toolkit Only
+
+For programmatic evaluation without the web interface:
 
 ```bash
 # Install the package
 pip install -e .
 
 # Set up API keys (free options available)
-export GROQ_API_KEY="your-groq-key"
-export GEMINI_API_KEY="your-gemini-key"
+export GROQ_API_KEY="your-groq-key"      # Free: https://console.groq.com/keys
+export GEMINI_API_KEY="your-gemini-key"  # Free: https://aistudio.google.com/app/apikey
 
-# Run a quick evaluation
-python examples/simple_evaluation.py
+# Run evaluation
+python -c "
+from llm_judge_auditor import EvaluationToolkit
+toolkit = EvaluationToolkit.from_preset('fast')
+result = toolkit.evaluate(
+    source_text='The capital of France is Paris.',
+    candidate_output='Paris is the capital of France.'
+)
+print(f'Score: {result.consensus_score}')
+"
 ```
 
 ---
 
-## 💻 Installation
+## 📋 Reproducibility Guide
 
 ### Prerequisites
 
-- **Python 3.9+** (for toolkit)
-- **Node.js 16+** (for web app frontend)
-- **PostgreSQL 15+** (for web app backend)
-- **Docker & Docker Compose** (optional, for containerized deployment)
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Python | 3.9+ | Backend & toolkit |
+| Node.js | 16+ | Frontend |
+| Docker | 20+ | Containerization |
+| Ollama | Latest | Local LLM (optional) |
 
-### Python Toolkit Installation
+### Step-by-Step Setup
 
+#### 1. Clone Repository
 ```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/llm-judge-auditor.git
+git clone https://github.com/BupeshKumarR/HybridEvalJudge.git
 cd llm-judge-auditor
-
-# 2. Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Install the package
-pip install -e .
-
-# 5. Set up API keys (choose free or paid options)
-./setup_env.sh
 ```
 
-### Web Application Installation
+#### 2. Environment Configuration
 
-See [web-app/README.md](web-app/README.md) for detailed setup instructions.
+Create `.env` file in `web-app/`:
+```bash
+# Database (Docker uses PostgreSQL, local uses SQLite fallback)
+DATABASE_URL=postgresql://llm_judge_user:changeme@postgres:5432/llm_judge_auditor
 
-**Quick Docker Setup:**
+# Security
+SECRET_KEY=your-secret-key-change-in-production
+
+# API Keys (optional - for cloud LLM judges)
+GROQ_API_KEY=your-groq-key
+GEMINI_API_KEY=your-gemini-key
+
+# Ollama (for local LLM)
+OLLAMA_HOST=http://host.docker.internal:11434
+```
+
+#### 3. Start Services
+
+**With Docker:**
 ```bash
 cd web-app
-cp .env.example .env
-# Edit .env with your configuration
 docker-compose up -d
+docker-compose logs -f  # Watch logs
 ```
 
----
-
-## 🌐 Web Application
-
-The web application provides an interactive interface for evaluating LLM outputs with real-time streaming, rich visualizations, and comprehensive reporting.
-
-### Features
-
-- **Interactive Chat Interface**: Submit evaluations and see results in real-time
-- **Real-Time Streaming**: Watch as each judge completes evaluation
-- **Rich Visualizations**:
-  - Judge comparison charts with confidence intervals
-  - Hallucination thermometer with severity breakdown
-  - Inter-judge agreement heatmaps
-  - Statistical metrics dashboard
-- **Session Management**: Save, search, and restore evaluation history
-- **Export Options**: Download results as JSON, CSV, or PDF
-- **User Authentication**: Secure multi-user support
-- **Responsive Design**: Works on all devices
-
-### Screenshots
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Chat Interface          │  Evaluation Results          │
-│  ┌────────────────────┐  │  ┌────────────────────────┐ │
-│  │ Source Text        │  │  │ Judge Scores           │ │
-│  │ Candidate Output   │  │  │ ├─ GPT-4: 87.5 ⭐⭐⭐  │ │
-│  │ [Submit]           │  │  │ ├─ Claude: 85.2 ⭐⭐⭐ │ │
-│  └────────────────────┘  │  │ └─ Gemini: 89.1 ⭐⭐⭐ │ │
-│                          │  │                        │ │
-│  History Sidebar         │  │ Hallucination: 12.3%   │ │
-│  ┌────────────────────┐  │  │ Confidence: 92%        │ │
-│  │ • Session 1        │  │  │ Agreement: 0.78        │ │
-│  │ • Session 2        │  │  └────────────────────────┘ │
-│  │ • Session 3        │  │                            │ │
-│  └────────────────────┘  │                            │ │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Quick Start
-
+**Without Docker:**
 ```bash
-cd web-app
+# Terminal 1: Backend
+cd web-app/backend
+source ../../.venv/bin/activate
+USE_SQLITE=true uvicorn app.main:app --reload --port 8000
 
-# Development mode
-make dev
+# Terminal 2: Frontend
+cd web-app/frontend
+npm install && npm start
+```
 
-# Production mode
-make prod
+#### 4. Verify Installation
+```bash
+# Check backend health
+curl http://localhost:8000/health
 
-# Access the application
+# Check frontend
 open http://localhost:3000
 ```
 
-See [web-app/README.md](web-app/README.md) for complete documentation.
+#### 5. Create Account & Login
+1. Navigate to http://localhost:3000
+2. Click "Register" to create an account
+3. Login with your credentials
 
 ---
 
-## 🐍 Python Toolkit Usage
+## Ollama Integration (Local LLM)
 
-### Basic Evaluation
+For privacy-focused evaluation using local models:
 
-```python
-from llm_judge_auditor import EvaluationToolkit
-
-# Initialize toolkit (uses API judges automatically if keys are set)
-toolkit = EvaluationToolkit.from_preset("fast")
-
-# Evaluate an output
-source = "The capital of France is Paris."
-candidate = "Paris is the capital and largest city of France."
-
-result = toolkit.evaluate(
-    source_text=source,
-    candidate_output=candidate
-)
-
-# Access results
-print(f"Consensus Score: {result.consensus_score}")
-print(f"Hallucination Score: {result.hallucination_score}")
-print(f"Confidence: {result.confidence_interval}")
-
-# View individual judge results
-for judge_result in result.judge_results:
-    print(f"{judge_result.judge_name}: {judge_result.score}")
-```
-
-### Advanced Configuration
-
-```python
-from llm_judge_auditor import EvaluationToolkit, ToolkitConfig, APIConfig
-
-# Configure with specific judges
-config = ToolkitConfig(
-    api_config=APIConfig(
-        groq_api_key="your-key",
-        gemini_api_key="your-key",
-        groq_model="llama-3.1-70b-versatile",
-        gemini_model="gemini-1.5-flash"
-    ),
-    enable_retrieval=True,
-    aggregation_strategy="weighted_average"
-)
-
-toolkit = EvaluationToolkit(config)
-
-# Batch evaluation
-results = toolkit.evaluate_batch([
-    {"source": source1, "candidate": candidate1},
-    {"source": source2, "candidate": candidate2}
-])
-```
-
-### Streaming Evaluation
-
-```python
-from llm_judge_auditor.components import StreamingEvaluator
-
-evaluator = StreamingEvaluator(toolkit)
-
-# Stream results as they arrive
-for event in evaluator.evaluate_streaming(source, candidate):
-    if event.type == "judge_result":
-        print(f"Judge {event.data.judge_name} scored: {event.data.score}")
-    elif event.type == "complete":
-        print(f"Final score: {event.data.consensus_score}")
-```
-
-### Command-Line Interface
-
+### Setup Ollama
 ```bash
-# Evaluate from command line
-llm-judge-auditor evaluate \
-  --source "The capital of France is Paris." \
-  --candidate "Paris is the capital of France." \
-  --output results.json
+# Install Ollama (macOS)
+brew install ollama
 
-# Batch evaluation from file
-llm-judge-auditor batch \
-  --input evaluations.jsonl \
-  --output results/
+# Start Ollama service
+ollama serve
 
-# Generate report
-llm-judge-auditor report \
-  --input results.json \
-  --format pdf \
-  --output report.pdf
+# Pull a model
+ollama pull llama3.2
+ollama pull mistral
 ```
+
+### Configure in Web App
+1. Go to Settings → Judge Configuration
+2. Enable "Use Ollama"
+3. Select your preferred model
+4. Evaluations now run locally without API calls
 
 ---
 
-## 📚 API Documentation
+## Evaluation Metrics
 
-### REST API
+### Hallucination Metrics
+| Metric | Description | Range |
+|--------|-------------|-------|
+| MiHR | Micro Hallucination Rate (claim-level) | 0-1 |
+| MaHR | Macro Hallucination Rate (response-level) | 0-1 |
+| FactScore | Verified claims / Total claims | 0-1 |
+| Fleiss' Kappa | Inter-judge agreement | -1 to 1 |
 
-The web application provides a comprehensive REST API for programmatic access.
-
-**Base URL**: `http://localhost:8000/api/v1`
-
-#### Key Endpoints
-
-```bash
-# Authentication
-POST /api/v1/auth/register
-POST /api/v1/auth/login
-GET  /api/v1/auth/me
-
-# Evaluations
-POST /api/v1/evaluations
-GET  /api/v1/evaluations
-GET  /api/v1/evaluations/{id}
-GET  /api/v1/evaluations/{id}/export?format=pdf
-
-# Preferences
-GET  /api/v1/preferences
-PUT  /api/v1/preferences
-```
-
-#### Example Request
-
-```bash
-curl -X POST http://localhost:8000/api/v1/evaluations \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_text": "The capital of France is Paris.",
-    "candidate_output": "Paris is the capital of France.",
-    "config": {
-      "judge_models": ["gpt-4", "claude-3"],
-      "enable_retrieval": true,
-      "aggregation_strategy": "mean"
-    }
-  }'
-```
-
-### WebSocket API
-
-Real-time evaluation streaming via WebSocket.
-
-```javascript
-import { io } from 'socket.io-client';
-
-const socket = io('ws://localhost:8000/ws', {
-  auth: { token: 'your-jwt-token' }
-});
-
-socket.emit('start_evaluation', {
-  session_id: 'uuid',
-  source_text: 'source',
-  candidate_output: 'output',
-  config: { judge_models: ['gpt-4'] }
-});
-
-socket.on('evaluation_progress', (data) => {
-  console.log(`Progress: ${data.progress}%`);
-});
-
-socket.on('evaluation_complete', (data) => {
-  console.log(`Score: ${data.consensus_score}`);
-});
-```
-
-**Full API Documentation**:
-- [REST API Documentation](web-app/docs/API_DOCUMENTATION.md)
-- [WebSocket Events](web-app/docs/WEBSOCKET_EVENTS.md)
-- [OpenAPI Specification](web-app/docs/openapi.yaml)
+### Uncertainty Quantification
+- **Shannon Entropy**: Overall uncertainty measure
+- **Epistemic Uncertainty**: Model knowledge gaps
+- **Aleatoric Uncertainty**: Inherent data ambiguity
 
 ---
 
-## ⚙️ Configuration
-
-### API Keys Setup
-
-The toolkit supports multiple LLM providers. You can use free or paid options.
-
-#### Free Options (Recommended for Getting Started)
-
-```bash
-# Groq (FREE - Llama 3.1 70B)
-export GROQ_API_KEY="your-groq-key"
-# Get key: https://console.groq.com/keys
-
-# Google Gemini (FREE - Gemini 1.5 Flash)
-export GEMINI_API_KEY="your-gemini-key"
-# Get key: https://aistudio.google.com/app/apikey
-```
-
-#### Paid Options (Higher Quality)
-
-```bash
-# OpenAI
-export OPENAI_API_KEY="your-openai-key"
-
-# Anthropic
-export ANTHROPIC_API_KEY="your-anthropic-key"
-```
-
-### Configuration Files
-
-```yaml
-# config/default_config.yaml
-judges:
-  - name: "gpt-4"
-    provider: "openai"
-    weight: 1.0
-  - name: "claude-3"
-    provider: "anthropic"
-    weight: 1.0
-
-verifier:
-  model: "specialized-verifier"
-  confidence_threshold: 0.7
-
-retrieval:
-  enabled: true
-  top_k: 5
-
-aggregation:
-  strategy: "weighted_average"
-```
-
-See [docs/guides/API_KEY_SETUP.md](docs/guides/API_KEY_SETUP.md) for detailed setup instructions.
-
----
-
-## 🏗️ Architecture
-
-### System Overview
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   Web Application                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   Frontend   │  │   Backend    │  │  PostgreSQL  │ │
-│  │   (React)    │◄─┤   (FastAPI)  │◄─┤   Database   │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-└────────────┬────────────────────────────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────────────────────────────┐
-│              Python Evaluation Toolkit                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   Judge      │  │  Verifier    │  │  Retrieval   │ │
-│  │   Ensemble   │  │  Component   │  │  Component   │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │ Aggregation  │  │   Metrics    │  │   Report     │ │
-│  │   Engine     │  │  Calculator  │  │  Generator   │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Core Components
-
-- **Judge Ensemble**: Manages multiple LLM judges for evaluation
-- **Verifier Component**: Specialized fact-checking models
-- **Retrieval Component**: Fetches relevant context from knowledge bases
-- **Aggregation Engine**: Combines judge scores with statistical methods
-- **Hallucination Metrics**: Research-backed quantification (MiHR, MaHR, FactScore, Fleiss' Kappa)
-- **Uncertainty Quantification**: Shannon entropy with epistemic/aleatoric decomposition
-- **Report Generator**: Creates comprehensive evaluation reports
-
-### Technology Stack
-
-**Backend**:
-- FastAPI (Python web framework)
-- SQLAlchemy (ORM)
-- PostgreSQL (Database)
-- Socket.IO (WebSocket)
-- JWT (Authentication)
-
-**Frontend**:
-- React 18 + TypeScript
-- TailwindCSS (Styling)
-- Recharts + D3.js (Visualizations)
-- Socket.IO Client (Real-time)
-- React Query (Data fetching)
-
-**Infrastructure**:
-- Docker + Docker Compose
-- Nginx (Reverse proxy)
-- Redis (Caching)
-
----
-
-## 🛠️ Development
-
-### Setting Up Development Environment
-
-```bash
-# Clone and setup
-git clone https://github.com/yourusername/llm-judge-auditor.git
-cd llm-judge-auditor
-
-# Install development dependencies
-pip install -r requirements.txt
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# Run linting
-black src/ tests/
-flake8 src/ tests/
-mypy src/
-```
-
-### Web Application Development
-
-```bash
-cd web-app
-
-# Backend development
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-
-# Frontend development
-cd frontend
-npm install
-npm start
-
-# Run tests
-cd backend && pytest
-cd frontend && npm test
-```
-
-### Project Structure
-
-```
-llm-judge-auditor/
-├── src/llm_judge_auditor/      # Python toolkit
-│   ├── components/             # Core components
-│   ├── utils/                  # Utilities
-│   └── evaluation_toolkit.py   # Main API
-├── web-app/                    # Web application
-│   ├── backend/                # FastAPI backend
-│   ├── frontend/               # React frontend
-│   └── docs/                   # API documentation
-├── tests/                      # Test suite
-│   ├── unit/                   # Unit tests
-│   ├── integration/            # Integration tests
-│   └── property/               # Property-based tests
-├── docs/                       # Documentation
-│   ├── guides/                 # User guides
-│   ├── security/               # Security docs
-│   └── development/            # Dev docs
-├── examples/                   # Usage examples
-├── config/                     # Configuration files
-└── scripts/                    # Utility scripts
-```
-
----
-
-## 🧪 Testing
-
-### Running Tests
+## Testing
 
 ```bash
 # Run all tests
 pytest
 
-# Run specific test categories
-pytest tests/unit/              # Unit tests
-pytest tests/integration/       # Integration tests
-pytest tests/property/          # Property-based tests
-
 # Run with coverage
 pytest --cov=src --cov-report=html
 
-# Run web app tests
+# Property-based tests
+pytest tests/property/
+
+# Web app backend tests
 cd web-app/backend && pytest
+
+# Web app frontend tests
 cd web-app/frontend && npm test
 ```
 
-### Property-Based Testing
+---
 
-We use Hypothesis for property-based testing to ensure correctness:
+##  Project Structure
 
-```python
-from hypothesis import given, strategies as st
-
-@given(st.text(), st.text())
-def test_evaluation_consistency(source, candidate):
-    """Evaluation should be deterministic for same inputs."""
-    result1 = toolkit.evaluate(source, candidate)
-    result2 = toolkit.evaluate(source, candidate)
-    assert result1.consensus_score == result2.consensus_score
+```
+llm-judge-auditor/
+├── src/llm_judge_auditor/      # Python evaluation toolkit
+│   ├── components/             # Core components (judges, verifiers, etc.)
+│   ├── utils/                  # Utilities (error handling, profiling)
+│   └── evaluation_toolkit.py   # Main API
+├── web-app/                    # Full-stack web application
+│   ├── backend/                # FastAPI backend
+│   │   ├── app/               # Application code
+│   │   │   ├── routers/       # API endpoints
+│   │   │   ├── services/      # Business logic
+│   │   │   └── models.py      # Database models
+│   │   └── tests/             # Backend tests
+│   ├── frontend/              # React frontend
+│   │   ├── src/
+│   │   │   ├── components/    # UI components
+│   │   │   ├── pages/         # Page components
+│   │   │   └── hooks/         # Custom hooks
+│   │   └── public/
+│   └── docker-compose.yml     # Container orchestration
+├── tests/                      # Toolkit tests
+│   ├── unit/                  # Unit tests
+│   ├── integration/           # Integration tests
+│   └── property/              # Property-based tests
+├── docs/                       # Documentation
+├── examples/                   # Usage examples
+└── config/                     # Configuration presets
 ```
 
 ---
 
-## 📖 Documentation
+##  Configuration
 
-### User Guides
-- [Quick Start Guide](docs/guides/QUICKSTART.md)
-- [API Key Setup](docs/guides/API_KEY_SETUP.md)
-- [Free Models Guide](docs/guides/FREE_MODELS_INFO.md)
+### Presets
 
-### API Documentation
-- [REST API Reference](web-app/docs/API_DOCUMENTATION.md)
-- [WebSocket Events](web-app/docs/WEBSOCKET_EVENTS.md)
-- [OpenAPI Specification](web-app/docs/openapi.yaml)
+```python
+from llm_judge_auditor import EvaluationToolkit
 
-### Component Documentation
-- [Usage Guide](docs/USAGE_GUIDE.md)
-- [CLI Usage](docs/CLI_USAGE.md)
-- [Hallucination Metrics](docs/HALLUCINATION_METRICS.md)
-- [Error Handling](docs/ERROR_HANDLING.md)
-- [Performance Optimization](docs/PERFORMANCE_OPTIMIZATION.md)
-- [Plugin System](docs/PLUGIN_SYSTEM.md)
+# Fast evaluation (2 judges, no retrieval)
+toolkit = EvaluationToolkit.from_preset("fast")
 
-### Development Documentation
-- [Implementation Review](docs/development/IMPLEMENTATION_REVIEW.md)
-- [Performance Optimization](docs/development/PERFORMANCE_OPTIMIZATION_SUMMARY.md)
-- [Error Handling](docs/development/COMPREHENSIVE_ERROR_HANDLING_SUMMARY.md)
+# Balanced (3 judges, basic retrieval)
+toolkit = EvaluationToolkit.from_preset("balanced")
 
-### Security
-- [Git Security Audit](docs/security/GIT_SECURITY_AUDIT.md)
-- [Safe to Push Guide](docs/security/SAFE_TO_PUSH.md)
+# Comprehensive (5 judges, full retrieval)
+toolkit = EvaluationToolkit.from_preset("comprehensive")
+```
+
+### Custom Configuration
+
+```python
+from llm_judge_auditor import EvaluationToolkit, ToolkitConfig
+
+config = ToolkitConfig(
+    judge_models=["groq-llama3", "gemini-flash"],
+    enable_retrieval=True,
+    aggregation_strategy="weighted_average",
+    confidence_threshold=0.7
+)
+toolkit = EvaluationToolkit(config)
+```
 
 ---
 
-## 🤝 Contributing
+##  Documentation
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+| Document | Description |
+|----------|-------------|
+| [API Documentation](web-app/docs/API_DOCUMENTATION.md) | REST API reference |
+| [WebSocket Events](web-app/docs/WEBSOCKET_EVENTS.md) | Real-time event reference |
+| [Hallucination Metrics](docs/HALLUCINATION_METRICS.md) | Metric definitions |
+| [CLI Usage](docs/CLI_USAGE.md) | Command-line interface |
+| [Testing Guide](TESTING_GUIDE.md) | Testing instructions |
+| [Development Guide](web-app/DEVELOPMENT.md) | Development setup |
+| [Deployment Guide](web-app/DEPLOYMENT.md) | Production deployment |
 
-### How to Contribute
+---
+
+##  Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
+3. Make changes and add tests
 4. Run tests (`pytest`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
+5. Commit (`git commit -m 'Add amazing feature'`)
+6. Push (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
-### Development Guidelines
-
-- Follow PEP 8 style guide
-- Write tests for new features
-- Update documentation
-- Use type hints
-- Run linters before committing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-## 📄 License
+##  License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- Built with [FastAPI](https://fastapi.tiangolo.com/), [React](https://react.dev/), and [PostgreSQL](https://www.postgresql.org/)
-- Visualization powered by [Recharts](https://recharts.org/) and [D3.js](https://d3js.org/)
-- Testing with [pytest](https://pytest.org/) and [Hypothesis](https://hypothesis.readthedocs.io/)
-- Free LLM APIs provided by [Groq](https://groq.com/) and [Google AI Studio](https://aistudio.google.com/)
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 📞 Support
+##  Acknowledgments
 
-- **Documentation**: [Full documentation](docs/)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/llm-judge-auditor/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/llm-judge-auditor/discussions)
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Support for additional LLM providers (Cohere, Mistral)
-- [ ] Advanced visualization options
-- [ ] Batch evaluation API endpoint
-- [ ] Custom judge model training
-- [ ] Multi-language support
-- [ ] Cloud deployment templates (AWS, GCP, Azure)
-- [ ] Mobile app
+- [FastAPI](https://fastapi.tiangolo.com/) - Backend framework
+- [React](https://react.dev/) - Frontend framework
+- [Ollama](https://ollama.ai/) - Local LLM runtime
+- [Groq](https://groq.com/) - Free LLM API
+- [Google AI Studio](https://aistudio.google.com/) - Free Gemini API
 
 ---
 
-**Made with ❤️ by the LLM Judge Auditor Team**
+**Made with ❤️ for reliable AI evaluation**
