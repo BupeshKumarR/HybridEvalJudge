@@ -53,7 +53,10 @@ const SessionItem: React.FC<{
   session: HistorySession;
   isSelected: boolean;
   onSelect: (id: string) => void;
-}> = ({ session, isSelected, onSelect }) => {
+  onDelete: (id: string) => void;
+}> = ({ session, isSelected, onSelect, onDelete }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -64,19 +67,71 @@ const SessionItem: React.FC<{
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(session.id);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteConfirm(false);
+  };
+
   return (
     <div
       onClick={() => onSelect(session.id)}
-      className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+      className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors group relative ${
         isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
       }`}
     >
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs text-gray-500">{formatTimestamp(session.timestamp)}</span>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(session.status)}`}>
-          {session.status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(session.status)}`}>
+            {session.status}
+          </span>
+          {/* Delete button - visible on hover */}
+          <button
+            onClick={handleDeleteClick}
+            className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all"
+            title="Delete session"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
       </div>
+      
+      {/* Delete confirmation overlay */}
+      {showDeleteConfirm && (
+        <div className="absolute inset-0 bg-white bg-opacity-95 flex items-center justify-center z-10 rounded">
+          <div className="text-center p-2">
+            <p className="text-sm text-gray-700 mb-2">Delete this chat?</p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={handleConfirmDelete}
+                className="px-3 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600"
+              >
+                Delete
+              </button>
+              <button
+                onClick={handleCancelDelete}
+                className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <p className="text-sm text-gray-900 line-clamp-2 mb-2">{session.sourcePreview}</p>
       {(session.consensusScore > 0 || session.hallucinationScore > 0) && (
         <div className="flex items-center gap-2 text-xs">
@@ -202,7 +257,7 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
 
         formattedSessions = response.sessions.map((session) => ({
           id: session.id,
-          timestamp: new Date(session.timestamp),
+          timestamp: session.created_at,
           sourcePreview: session.source_preview,
           consensusScore: session.consensus_score || 0,
           hallucinationScore: session.hallucination_score || 0,
@@ -256,6 +311,24 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
     loadSessions(1, newFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    try {
+      if (historyMode === 'chat') {
+        await chatApi.deleteSession(sessionId);
+      } else {
+        await evaluationsApi.deleteEvaluation(sessionId);
+      }
+      // Remove from local state
+      setSessions(sessions.filter(s => s.id !== sessionId));
+      // If deleted session was selected, clear selection
+      if (currentSessionId === sessionId && onNewChat) {
+        onNewChat();
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
+  }, [historyMode, sessions, setSessions, currentSessionId, onNewChat]);
 
   return (
     <div className={`flex flex-col h-full bg-white border-r border-gray-200 ${className}`}>
@@ -338,6 +411,7 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                 session={session}
                 isSelected={currentSessionId === session.id}
                 onSelect={(id) => onSelectSession(id, historyMode === 'evaluations')}
+                onDelete={handleDeleteSession}
               />
             ))}
           </div>

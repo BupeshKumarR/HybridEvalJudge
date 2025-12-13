@@ -76,7 +76,7 @@ Thumbs.db
 
 # Project specific
 config/local_*.yaml
-.kiro/specs/llm-judge-auditor
+.kiro/specs/*
 
 # Benchmarks
 benchmarks/

@@ -168,11 +168,18 @@ export interface EvaluationSession {
 
 export interface SessionSummary {
   id: string;
-  timestamp: string;
+  /** @deprecated Use created_at instead */
+  timestamp?: string;
+  created_at: string;
+  completed_at?: string;
   source_preview: string;
+  candidate_preview?: string;
   consensus_score: number;
   hallucination_score: number;
-  status: 'completed' | 'pending' | 'failed';
+  status: 'completed' | 'pending' | 'in_progress' | 'failed' | 'cancelled';
+  num_judge_results?: number;
+  num_verifier_verdicts?: number;
+  num_flagged_issues?: number;
 }
 
 export interface HistoryResponse {
